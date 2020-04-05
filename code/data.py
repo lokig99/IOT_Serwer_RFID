@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-import datetime
-import os
+import datetime, os
 from random import randrange
 
 __DATA_DIR_PATH__ = "data/"
