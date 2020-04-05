@@ -2,9 +2,10 @@
 import datetime, os
 from random import randrange
 
-dataDirPath = "data/"
-empHistoryDir = "emp_history/"
-entryExt = ".csv"
+__DATA_DIR_PATH__ = "data/"
+__EMP_HISTORY_DIR_PATH__ = f"{__DATA_DIR_PATH__}emp_history/"
+__ENTRY_EXTENSION__ = ".csv"
+__EMPLOYEES_FILE_PATH__ = f"{__DATA_DIR_PATH__}employees{__ENTRY_EXTENSION__}"
 
 ### dictionaries ###
 emp_hist_dict = {}
@@ -24,10 +25,13 @@ class EmployeesFileEmptyError(Exception):
     """Raised when employees file has no entries in it"""
     pass
 
-####################
+class EmployeeRecordAlreadyExistsError(Exception):
+    pass
 
-with open(f"{dataDirPath}{empHistoryDir}/.format.txt") as file:
-    rowOffset = len(file.readline()) + 1
+class NoSuchEmployeeError(Exception):
+    pass
+
+####################
 
 def generateKey(length):
     if length <= 0:
@@ -46,12 +50,13 @@ def generateKey(length):
 
 
 def addEntry(employee_uid, date=datetime.datetime.now()):
-    filePath = f"{dataDirPath}{empHistoryDir}{employee_uid}{entryExt}"
-
-    if os.path.exists(filePath):
-        file = open(filePath, "a")
+    if employee_uid not in emp_name_dict.keys():
+        raise NoSuchEmployeeError
+    
+    if os.path.exists(__EMP_HISTORY_DIR_PATH__):
+        file = open(__EMP_HISTORY_DIR_PATH__, "a")
     else:
-        file = open(filePath, "w")
+        file = open(__EMP_HISTORY_DIR_PATH__, "w")
 
     entryText = f"{'0' + str(date.day) if date.day < 10 else date.day };" \
         f"{'0' + str(date.month) if date.month < 10 else date.month};" \
@@ -68,64 +73,117 @@ def clearDictionaries():
     emp_name_dict.clear()
     rfid_emp_dict.clear()       
 
-def loadData():
+def reloadData():
     clearDictionaries()
-    filePath = f"{dataDirPath}employees{entryExt}"
-    if not os.path.exists(filePath):
-        raise NoEmployeesFileError(f"there is no '{filePath}' file")
-    elif os.stat(filePath).st_size == 0:
-        raise EmployeesFileEmptyError(f"'{filePath}' file is empty")
+    if not os.path.exists(__EMPLOYEES_FILE_PATH__):
+        raise NoEmployeesFileError(f"there is no '{__EMPLOYEES_FILE_PATH__}' file")
+    elif os.stat(__EMPLOYEES_FILE_PATH__).st_size == 0:
+        raise EmployeesFileEmptyError(f"'{__EMPLOYEES_FILE_PATH__}' file is empty")
     
     #create name_emp and rfid_emp dictionary entries
-    with open(filePath, "r") as file:
+    with open(__EMPLOYEES_FILE_PATH__, "r") as file:
         line = file.readline()
         while line != "":
             (emp_uid, name, rfid_uid) = line.split(';')
             name_emp_dict[name] = emp_uid
             emp_name_dict[emp_uid] = name
-            rfid_emp_dict[rfid_uid] = emp_uid
-            emp_rfid_dict[emp_uid] = rfid_uid
+            rfid_emp_dict[int(rfid_uid)] = emp_uid
+            emp_rfid_dict[emp_uid] = int(rfid_uid)
+            line = file.readline()
     
-    #create emp_history dictionary entries
+    #create emp_history dictionary
     for emp_uid in emp_name_dict.keys():
-        filePath = f"{dataDirPath}{empHistoryDir}{emp_uid}{entryExt}"
+        emp_hist_dict[emp_uid] = []
+
+    #add entries to emp_history dictionary
+    for emp_uid in emp_hist_dict.keys():
+        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__ENTRY_EXTENSION__}"
         if os.path.exists(filePath):
             with open(filePath, "r") as file:
-
-
-
+                line = file.readline()
+                while line != "":
+                    entry = tuple([int(item) for item in line.split(';')])
+                    emp_hist_dict[emp_uid].append(entry)
+                    line = file.readline()
 
     
-
-
-
-
 def addEmployee(emp_uid, name, rfid_uid):
-    pass
+    if emp_uid in emp_name_dict.keys():
+        raise EmployeeRecordAlreadyExistsError
+
+    if os.path.exists(__EMPLOYEES_FILE_PATH__):
+        file = open(__EMPLOYEES_FILE_PATH__, "a")
+    else:
+        file = open(__EMPLOYEES_FILE_PATH__, "w")
+
+    file.write(f"{emp_uid};{name};{rfid_uid}\n")
+    file.close()
+    reloadData()
+
+def deleteEmployee(emp_uid, delHistory=True):
+    if emp_uid not in emp_name_dict.keys():
+        raise NoSuchEmployeeError
+
+    if os.path.exists(__EMPLOYEES_FILE_PATH__):
+        with open(__EMPLOYEES_FILE_PATH__, "r") as file:
+            lines = file.readlines()
+        with open(__EMPLOYEES_FILE_PATH__, "w") as file:
+            for line in lines:
+                print(len(lines))
+                if line.split(';')[0] != str(emp_uid):
+                    file.write(line)
+    else:
+        raise NoEmployeesFileError
+    
+    #delete history file
+    if delHistory:
+        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__ENTRY_EXTENSION__}"
+        if os.path.exists(filePath):
+            os.remove(filePath)
+    reloadData()
+
+def modifyEmpName(emp_uid, newName):
+    if emp_uid not in emp_name_dict.keys():
+        raise NoSuchEmployeeError
+
+    if os.path.exists(__EMPLOYEES_FILE_PATH__):
+        with open(__EMPLOYEES_FILE_PATH__, "r") as file:
+            lines = file.readlines()
+            for line in lines:
+                (uid, name, rfid_uid) = line.split(';')
+                if uid == emp_uid:
+                    rfid_uid = rfid_uid.strip('\n')
+                    break
+        deleteEmployee(uid, delHistory=False)
+        addEmployee(uid, newName, rfid_uid)
+
+def modifyEmpRFID(emp_uid, new_rfid_uid):
+    if emp_uid not in emp_name_dict.keys():
+        raise NoSuchEmployeeError
+
+    if os.path.exists(__EMPLOYEES_FILE_PATH__):
+        with open(__EMPLOYEES_FILE_PATH__, "r") as file:
+            lines = file.readlines()
+            for line in lines:
+                (uid, name, rfid_uid) = line.split(';')
+                if uid == emp_uid:
+                    break
+        deleteEmployee(uid, delHistory=False)
+        addEmployee(uid, name, new_rfid_uid) 
 
 
-
-
-""" with open("data/employees/aaaa.csv", "r") as file:
-    line = file.readline()
-    while line != "":
-        entry = tuple([int(item) for item in line.split(';')])
-        print(entry)
-        employees['aaaa'].append(entry)
-        line = file.readline()
-print(employees) """
 
 
 def test():
-    loadData()
-
-    emp_hist_dict[403] = ("Andrzej Kowalski", 0, [])
-    emp_hist_dict[generateKey(4)] = ("Adam Nowak", 0, [])
-
+    #addEmployee("eeee", "Ryszard Samosia", 999)
+    #addEmployee("aaaa", "Adam Abacki", 403)
+    reloadData()
+    modifyEmpName("bbbb", "Krzysztof Kowalski")
+    print(emp_name_dict)
+    print(name_emp_dict)
+    print(emp_rfid_dict)
+    print(rfid_emp_dict)
     print(emp_hist_dict)
-
-    for emp_uid in emp_hist_dict.keys():
-        addEntry(emp_uid)
 
 if __name__ == "__main__":
     test()
