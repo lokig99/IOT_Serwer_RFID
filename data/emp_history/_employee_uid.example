@@ -1,7 +1,7 @@
-[day];[month];[year];[hour];[minute]
-[day];[month];[year];[hour];[minute]
-[day];[month];[year];[hour];[minute]
-[day];[month];[year];[hour];[minute]
+[day];[month];[year];[hour];[minute];[terminal]
+[day];[month];[year];[hour];[minute];[terminal]
+[day];[month];[year];[hour];[minute];[terminal]
+[day];[month];[year];[hour];[minute];[terminal]
 .
 .
 .
@@ -12,5 +12,5 @@
 
 
 #example
-1;13;2;2013;9;2 
-2;13;2;2013;17;0
+1;13;2;2013;9;2;1
+2;13;2;2013;17;0;88
