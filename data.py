@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import datetime, os
+import datetime
+import os
 from random import randrange
 
 __DATA_DIR_PATH__ = "data/"
@@ -18,22 +19,15 @@ emp_rfid_dict = {}
 
 #### exceptions ####
 
-
-class NoEmployeesFileError(Exception):
-    """Raised when there is no employees file in data dir"""
-    pass
-
-
-class EmployeesFileEmptyError(Exception):
-    """Raised when employees file has no entries in it"""
-    pass
-
-
 class EmployeeRecordAlreadyExistsError(Exception):
     pass
 
 
 class NoSuchEmployeeError(Exception):
+    pass
+
+
+class NoDataError(Exception):
     pass
 
 ####################
@@ -86,11 +80,9 @@ def clearDictionaries():
 def reloadData():
     clearDictionaries()
     if not os.path.exists(__EMPLOYEES_FILE_PATH__):
-        raise NoEmployeesFileError(
-            f"there is no '{__EMPLOYEES_FILE_PATH__}' file")
-    elif os.stat(__EMPLOYEES_FILE_PATH__).st_size == 0:
-        raise EmployeesFileEmptyError(
-            f"'{__EMPLOYEES_FILE_PATH__}' file is empty")
+        return
+    if os.stat(__EMPLOYEES_FILE_PATH__).st_size == 0:
+        return
 
     # create name_emp and rfid_emp dictionary entries
     with open(__EMPLOYEES_FILE_PATH__, "r") as file:
@@ -142,7 +134,6 @@ def deleteEmployee(emp_uid, delHistory=True):
             lines = file.readlines()
         with open(__EMPLOYEES_FILE_PATH__, "w") as file:
             for line in lines:
-                print(len(lines))
                 if line.split(';')[0] != str(emp_uid):
                     file.write(line)
     else:
@@ -186,14 +177,44 @@ def modifyEmpRFID(emp_uid, new_rfid_uid):
         deleteEmployee(uid, delHistory=False)
         addEmployee(uid, name, new_rfid_uid)
 
+
 def generateReport(emp_uid):
-    pass
+    if emp_uid not in emp_name_dict.keys():
+        raise NoSuchEmployeeError
+    if len(emp_hist_dict[emp_uid]) == 0:
+        raise NoDataError
+
+    workDays = []  # date of entrance, date of leave, delta_time
+    isWorkEntrace = True
+    (day, month, year, hour, minute, terminal) = emp_hist_dict[emp_uid][0]
+    prevDate = datetime.datetime(year, month, day, hour, minute)
+    for entry in emp_hist_dict[emp_uid][1:]:
+        isWorkEntrace = not isWorkEntrace
+        (day, month, year, hour, minute, terminal) = entry
+        if isWorkEntrace:
+            prevDate = datetime.datetime(year, month, day, hour, minute)
+        else:
+            currentDate = datetime.datetime(year, month, day, hour, minute)
+            workDays.append((prevDate, currentDate, (currentDate - prevDate)))
+
+    filePath = f"{__REPORT_DIR_PATH__}" \
+        f"{emp_name_dict[emp_uid].replace(' ', '_')}_" \
+        f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}" \
+        f"{__ENTRY_EXTENSION__}"
+
+    with open(filePath, "w") as file:
+        for workDay in workDays:
+            file.write(
+                f"{workDay[0].strftime('%d/%m/%Y')};{workDay[1].strftime('%d/%m/%Y')};{workDay[2].total_seconds()}\n")
+    return filePath
+
 
 def test():
     #addEmployee("eeee", "Ryszard Samosia", 999)
     #addEmployee("aaaa", "Adam Abacki", 403)
     reloadData()
-    addEntry("cccc")
+    # addEntry("cccc")
+    generateReport("cccc")
     print(emp_name_dict)
     print(name_emp_dict)
     print(emp_rfid_dict)
