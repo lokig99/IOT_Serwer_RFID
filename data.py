@@ -214,7 +214,7 @@ def test():
     #addEmployee("aaaa", "Adam Abacki", 403)
     reloadData()
     # addEntry("cccc")
-    generateReport("cccc")
+    #generateReport("cccc")
     print(emp_name_dict)
     print(name_emp_dict)
     print(emp_rfid_dict)

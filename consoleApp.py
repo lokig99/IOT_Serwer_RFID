@@ -119,6 +119,7 @@ def generateReport():
     print("[1] Select employee with his name")
     print("[2] Select employee with his UID")
     print("[3] go back to main menu")
+    option = 3
     try:
         option = int(input("Enter option number: "))
     except:
@@ -157,7 +158,6 @@ def generateReport():
 def test():
     data.reloadData()
     displayMenu()
-
 
 if __name__ == "__main__":
     test()
