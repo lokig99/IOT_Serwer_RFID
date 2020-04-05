@@ -137,7 +137,7 @@ def deleteEmployee(emp_uid, delHistory=True):
                 if line.split(';')[0] != str(emp_uid):
                     file.write(line)
     else:
-        raise NoEmployeesFileError
+        return
 
     # delete history file
     if delHistory:
