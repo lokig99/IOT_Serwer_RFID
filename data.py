@@ -5,8 +5,9 @@ from random import randrange
 
 __DATA_DIR_PATH__ = "data/"
 __EMP_HISTORY_DIR_PATH__ = f"{__DATA_DIR_PATH__}emp_history/"
-__ENTRY_EXTENSION__ = ".csv"
-__EMPLOYEES_FILE_PATH__ = f"{__DATA_DIR_PATH__}employees{__ENTRY_EXTENSION__}"
+__DATA_EXTENSION__ = ".data"
+__REPORT_EXTENSION__ = ".csv"
+__EMPLOYEES_FILE_PATH__ = f"{__DATA_DIR_PATH__}employees{__DATA_EXTENSION__}"
 __REPORT_DIR_PATH__ = "reports/"
 
 ### dictionaries ###
@@ -54,7 +55,7 @@ def addEntry(employee_uid, rfid_terminal=1, date=datetime.datetime.now()):
     if employee_uid not in emp_name_dict.keys():
         raise NoSuchEmployeeError
 
-    filePath = f"{__EMP_HISTORY_DIR_PATH__}{employee_uid}{__ENTRY_EXTENSION__}"
+    filePath = f"{__EMP_HISTORY_DIR_PATH__}{employee_uid}{__DATA_EXTENSION__}"
     if os.path.exists(filePath):
         file = open(filePath, "a")
     else:
@@ -78,12 +79,19 @@ def clearDictionaries():
 
 
 def reloadData():
-    clearDictionaries()
+    if not os.path.exists(__DATA_DIR_PATH__):
+        os.mkdir(__DATA_DIR_PATH__)
+
+    if not os.path.exists(__EMP_HISTORY_DIR_PATH__):
+        os.mkdir(__EMP_HISTORY_DIR_PATH__)
+
     if not os.path.exists(__EMPLOYEES_FILE_PATH__):
-        return
+        open(__EMPLOYEES_FILE_PATH__, "w")
+
     if os.stat(__EMPLOYEES_FILE_PATH__).st_size == 0:
         return
 
+    clearDictionaries()
     # create name_emp and rfid_emp dictionary entries
     with open(__EMPLOYEES_FILE_PATH__, "r") as file:
         line = file.readline()
@@ -101,7 +109,7 @@ def reloadData():
 
     # add entries to emp_history dictionary
     for emp_uid in emp_hist_dict.keys():
-        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__ENTRY_EXTENSION__}"
+        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
         if os.path.exists(filePath):
             with open(filePath, "r") as file:
                 line = file.readline()
@@ -141,7 +149,7 @@ def deleteEmployee(emp_uid, delHistory=True):
 
     # delete history file
     if delHistory:
-        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__ENTRY_EXTENSION__}"
+        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
         if os.path.exists(filePath):
             os.remove(filePath)
     reloadData()
@@ -181,8 +189,12 @@ def modifyEmpRFID(emp_uid, new_rfid_uid):
 def generateReport(emp_uid):
     if emp_uid not in emp_name_dict.keys():
         raise NoSuchEmployeeError
+    
     if len(emp_hist_dict[emp_uid]) == 0:
         raise NoDataError
+
+    if os.path.exists(__REPORT_DIR_PATH__):
+        os.mkdir(__REPORT_DIR_PATH__)
 
     workDays = []  # date of entrance, date of leave, delta_time
     isWorkEntrace = True
@@ -200,7 +212,7 @@ def generateReport(emp_uid):
     filePath = f"{__REPORT_DIR_PATH__}" \
         f"{emp_name_dict[emp_uid].replace(' ', '_')}_" \
         f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}" \
-        f"{__ENTRY_EXTENSION__}"
+        f"{__REPORT_EXTENSION__}"
 
     with open(filePath, "w") as file:
         for workDay in workDays:
