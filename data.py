@@ -189,11 +189,11 @@ def modifyEmpRFID(emp_uid, new_rfid_uid):
 def generateReport(emp_uid):
     if emp_uid not in emp_name_dict.keys():
         raise NoSuchEmployeeError
-    
+
     if len(emp_hist_dict[emp_uid]) == 0:
         raise NoDataError
 
-    if os.path.exists(__REPORT_DIR_PATH__):
+    if not os.path.exists(__REPORT_DIR_PATH__):
         os.mkdir(__REPORT_DIR_PATH__)
 
     workDays = []  # date of entrance, date of leave, delta_time
