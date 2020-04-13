@@ -130,6 +130,12 @@ class EmployeesDataBase:
             tuple([int(item) for item in entryText.split(';')]))
 
     def addEmployee(self, rfid_uid, emp_uid="", name=""):
+        """
+        Throws exceptions:\n
+        \tdata.InvalidInputDataError
+        \tdata.RfidAlreadyUsedError
+        \tdata.EmployeeRecordAlreadyExistsError
+        """
         if not self.__validate_input(rfid_uid=rfid_uid, emp_uid=emp_uid, name=name):
             raise InvalidInputDataError
 
@@ -220,6 +226,15 @@ class EmployeesDataBase:
             history = self.__emp_hist_dict[emp_uid][:]
             dataSummary.append((emp_uid, name, rfid_uid, history))
         return dataSummary
+
+    def getEmpName(self, rfid_uid):
+        if not self.__validate_input(rfid_uid=rfid_uid):
+            raise InvalidInputDataError
+
+        if rfid_uid in self.__rfid_emp_dict.keys():
+            return str(self.__emp_name_dict[self.__rfid_emp_dict[rfid_uid]])
+        else:
+            raise NoSuchEmployeeError
 
     def generateReport(self, rfid_uid):
         if not self.__validate_input(rfid_uid=rfid_uid):

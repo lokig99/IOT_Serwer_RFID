@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import data, rfid, config
+import data as d, rfid, config
+
+database = d.EmployeesDataBase()
 
 def displayMenu():
     print("\n--- Console RFID client Menu ---")
@@ -46,28 +48,17 @@ def registerRFID(verbose=True, rfid_uid_non_verbose=0):
     else:
         rfid_uid = rfid_uid_non_verbose
         name = str(rfid_uid)
-
-    #check if RFID card is already used
-    if rfid_uid in data.rfid_emp_dict.keys():
-        print(f"ERROR: Given card is already used by employee named {data.emp_name_dict[data.rfid_emp_dict[rfid_uid]]}")
-        return
     
-    #check if user is already registered
-    if name in data.name_emp_dict.keys():
-        emp_uid = data.name_emp_dict[name]
-        data.modifyEmpRFID(emp_uid, rfid_uid)
-        print(f"Changed RFID card UID for {name} (employee-uid='{emp_uid}')")
-    else:
-        #generate new employee uid
-        emp_uid = data.generateKey(4)
-        while emp_uid in data.emp_name_dict.keys():
-            emp_uid = data.generateKey(4)
+    try:
+        database.addEmployee(rfid_uid, name=name)
+        print(f"New employee named {name} registered with rfid-uid = {rfid_uid}")
+    except d.InvalidInputDataError:
+        print("ERROR: Invalid input format!\nMake sure name does not contain ';' characters")
+        return
+    except d.RfidAlreadyUsedError:
+        print(f"ERROR: Given card is already used by employee named {database.getEmpName(rfid_uid)}")
+        return
 
-        #add new employee
-        data.addEmployee(emp_uid, name, rfid_uid)
-        print(f"New employee named {name} registered with employee-uid = '{emp_uid}'")
-
-      
 def removeRFID():
     rfid_uid = RFIDsubMenu()
 
@@ -156,7 +147,6 @@ def generateReport():
     
     
 def test():
-    data.reloadData()
     displayMenu()
 
 if __name__ == "__main__":
