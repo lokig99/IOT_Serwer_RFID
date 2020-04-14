@@ -89,10 +89,9 @@ class EmployeesDataBase:
         """
         Deletes all entries of single employee in database dictionaries
         without modifying data files on storage device or reloading whole
-        database from storage.
-        \n*Param*: emp_uid - employee's UID 
-        \nReturns: 
-        \n\tNone 
+        database from storage.\n
+        Returns:\n 
+        \tNone 
         """
         if emp_uid not in self.__emp_name_dict.keys():
             return
@@ -106,11 +105,17 @@ class EmployeesDataBase:
     def __validate_input(self, emp_uid="", name="", rfid_uid=0):
         if ';' in emp_uid or ';' in name:
             return False
-        if rfid_uid < 0 or not isinstance(rfid_uid, int):
+        if not isinstance(rfid_uid, int) or rfid_uid < 0:
             return False
         return True
 
     def addEntry(self, rfid_uid, rfid_terminal=1, date=datetime.datetime.now()):
+        """
+        Returns:\n
+        \tNone
+        Throws exceptions:\n
+        \tdata.NoSuchEmployeeError
+        """
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
 
@@ -131,6 +136,8 @@ class EmployeesDataBase:
 
     def addEmployee(self, rfid_uid, emp_uid="", name=""):
         """
+        Returns:\n
+        \tNone
         Throws exceptions:\n
         \tdata.InvalidInputDataError
         \tdata.RfidAlreadyUsedError
@@ -162,6 +169,14 @@ class EmployeesDataBase:
         self.__reload_data()
 
     def deleteEmployee(self, rfid_uid, delHistory=True):
+        """
+        Returns:\n
+        \tNone
+        Throws exceptions:\n
+        \tdata.InvalidInputDataError
+        \tdata.NoSuchEmployeeError
+        \tdata.DataBaseError
+        """
         if not self.__validate_input(rfid_uid=rfid_uid):
             raise InvalidInputDataError
 
@@ -191,6 +206,13 @@ class EmployeesDataBase:
         self.__remove_employee_from_dict(emp_uid)
 
     def modifyEmpName(self, rfid_uid, newName):
+        """
+        Returns:\n
+        \tNone
+        Throws exceptions:\n
+        \tdata.InvalidInputDataError
+        \tdata.NoSuchEmployeeError
+        """
         if not self.__validate_input(rfid_uid=rfid_uid, name=newName):
             raise InvalidInputDataError
 
@@ -203,6 +225,14 @@ class EmployeesDataBase:
         self.addEmployee(rfid_uid, emp_uid=emp_uid, name=newName)
 
     def modifyEmpRFID(self, rfid_uid, new_rfid_uid):
+        """
+        Returns:\n
+        \tNone
+        Throws exceptions:\n
+        \tdata.InvalidInputDataError
+        \tdata.NoSuchEmployeeError
+        \tdata.RfidAlreadyUsedError
+        """
         if not self.__validate_input(rfid_uid=rfid_uid) or not self.__validate_input(rfid_uid=new_rfid_uid):
             raise InvalidInputDataError
 
@@ -218,16 +248,34 @@ class EmployeesDataBase:
         self.deleteEmployee(rfid_uid, delHistory=False)
         self.addEmployee(new_rfid_uid, emp_uid=emp_uid, name=name)
 
-    def getEmployeesDataSummary(self):
+    def getEmployeesDataSummary(self, includeHistory=True):
+        """
+        if (includeHistory == False) then list 'history' in every tuple is empty\n
+        Returns:\n
+        \tlist dataSummary:
+        \t(list of tuple(str emp-uid, str emp-name, int rfid-uid, list history) for each employee)
+        Throws exceptions:\n
+        \tNone
+        """
         dataSummary = []
         for emp_uid in self.__emp_name_dict.keys():
-            name = self.__emp_name_dict[emp_uid]
+            name = str(self.__emp_name_dict[emp_uid])
             rfid_uid = self.__emp_rfid_dict[emp_uid]
-            history = self.__emp_hist_dict[emp_uid][:]
-            dataSummary.append((emp_uid, name, rfid_uid, history))
+            if includeHistory:
+                history = self.__emp_hist_dict[emp_uid][:]
+            else:
+                history = []
+            dataSummary.append((str(emp_uid), name, rfid_uid, history))
         return dataSummary
 
     def getEmpName(self, rfid_uid):
+        """
+        Returns:\n
+        \tstr employee-name
+        Throws exceptions:\n
+        \tdata.InvalidInputDataError
+        \tdata.NoSuchEmployeeError
+        """
         if not self.__validate_input(rfid_uid=rfid_uid):
             raise InvalidInputDataError
 
@@ -237,6 +285,14 @@ class EmployeesDataBase:
             raise NoSuchEmployeeError
 
     def generateReport(self, rfid_uid):
+        """
+        Returns:\n
+        \tstr path-to-report
+        Throws exceptions:\n
+        \tdata.InvalidInputDataError
+        \tdata.NoSuchEmployeeError
+        \tdata.NoDataError
+        """
         if not self.__validate_input(rfid_uid=rfid_uid):
             raise InvalidInputDataError
 

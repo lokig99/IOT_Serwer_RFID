@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import data as d, rfid, config
+import data as d, rfid, config, os, time
+from operator import itemgetter
 
 database = d.EmployeesDataBase()
+__PROGRAM_STATUS__ = True
 
 def displayMenu():
     print("\n--- Console RFID client Menu ---")
@@ -12,15 +14,27 @@ def displayMenu():
     print("[5] scan RFID")
     print("[6] generate report for employee")
     print("[7] Exit program")
-    selectOption()
+
+def printEmployeesList():
+    emp_data = database.getEmployeesDataSummary(includeHistory=False)
+    emp_data.sort(key=itemgetter(1))
+    emp_data.sort(key=lambda tup: tup[0] == tup[1])
+
+    for index, emp in enumerate(emp_data, 1):
+        print(f"[{index}] {emp[1]} ({emp[2]}, {emp[0]})")
+
 
 
 def selectOption():
+    global __PROGRAM_STATUS__
+
     try:
         option = int(input("Enter option number: "))
+        
     except:
         print("incorrect input")
-        selectOption()
+        time.sleep(1)
+        return
 
     if option == 1:
         print("Option not implemented in this version")
@@ -35,11 +49,10 @@ def selectOption():
     elif option == 6:
         generateReport()
     elif option == 7:
-        return
+        __PROGRAM_STATUS__ = False
     else:
         print("No such option available")
-    print()
-    displayMenu()
+        time.sleep(1)
 
 def registerRFID(verbose=True, rfid_uid_non_verbose=0):
     if verbose:
@@ -145,9 +158,14 @@ def generateReport():
     except data.NoDataError:
         print(f"User has no entries")
     
-    
-def test():
-    displayMenu()
+  
+def main():
+    os.system("cls" if os.name == "nt" else "clear")
+    while __PROGRAM_STATUS__:
+        displayMenu()
+        selectOption()
+        os.system("cls" if os.name == "nt" else "clear")
+    #printEmployeesList()
 
 if __name__ == "__main__":
-    test()
+    main()
