@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import data as d, rfid, config, os, time
+import data as d, rfid, config, os, time, server
 from operator import itemgetter
 
 database = d.EmployeesDataBase()
@@ -10,10 +10,10 @@ def displayMenu():
     print("[1] Connect new terminal to server")
     print("[2] Remove connected terminal")
     print("[3] Register new RFID card for new/current employee")
-    print("[4] remove RFID card")
-    print("[5] scan RFID")
-    print("[6] generate report for employee")
-    print("[7] Exit program")
+    #print("[4] remove RFID card")
+    #print("[5] scan RFID")
+    print("[4] generate report for employee")
+    print("[5] Stop server and exit")
 
 def printEmployeesList():
     emp_data = database.getEmployeesDataSummary(includeHistory=False)
@@ -22,8 +22,6 @@ def printEmployeesList():
 
     for index, emp in enumerate(emp_data, 1):
         print(f"[{index}] {emp[1]} ({emp[2]}, {emp[0]})")
-
-
 
 def selectOption():
     global __PROGRAM_STATUS__
@@ -43,12 +41,8 @@ def selectOption():
     elif option == 3:
         registerRFID()
     elif option == 4:
-        removeRFID()
-    elif option == 5:
-        scanRFID()
-    elif option == 6:
         generateReport()
-    elif option == 7:
+    elif option == 5:
         __PROGRAM_STATUS__ = False
     else:
         print("No such option available")
@@ -160,12 +154,13 @@ def generateReport():
     
   
 def main():
+    server.run()
     os.system("cls" if os.name == "nt" else "clear")
     while __PROGRAM_STATUS__:
         displayMenu()
         selectOption()
         os.system("cls" if os.name == "nt" else "clear")
-    #printEmployeesList()
+    server.stop()
 
 if __name__ == "__main__":
     main()

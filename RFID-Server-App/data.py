@@ -365,15 +365,13 @@ class InvalidInputDataError(DataBaseError):
 
 def test():
     data = EmployeesDataBase()
-    #data.addEmployee(12345)
-    #data.addEmployee(1111)
-    #data.addEmployee(2222)
-    
+    # data.addEmployee(12345)
+    # data.addEmployee(1111)
+    # data.addEmployee(2222)
+
     data.modifyEmpRFID(1111, 9999)
-    
-    
+
     print(data.getEmployeesDataSummary())
-    
 
 
 if __name__ == "__main__":
