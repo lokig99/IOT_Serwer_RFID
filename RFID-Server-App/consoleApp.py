@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-import data as d, rfid, config, os, time, server
+import data as d, config, os, time, server
 from operator import itemgetter
 
 database = d.EmployeesDataBase()
 __PROGRAM_STATUS__ = True
 
 def displayMenu():
-    print("\n--- Console RFID client Menu ---")
+    print("--- Console RFID server Menu ---\n")
     print("[1] Connect new terminal to server")
     print("[2] Remove connected terminal")
     print("[3] Register new RFID card for new/current employee")
     #print("[4] remove RFID card")
     #print("[5] scan RFID")
     print("[4] generate report for employee")
-    print("[5] Stop server and exit")
+    print("[5] enter server-log mode")
+    print("[6] Stop server and exit")
 
 def printEmployeesList():
     emp_data = database.getEmployeesDataSummary(includeHistory=False)
@@ -27,7 +28,7 @@ def selectOption():
     global __PROGRAM_STATUS__
 
     try:
-        option = int(input("Enter option number: "))
+        option = int(input("\nEnter option number: "))
         
     except:
         print("incorrect input")
@@ -43,6 +44,8 @@ def selectOption():
     elif option == 4:
         generateReport()
     elif option == 5:
+        pass
+    elif option == 6:
         __PROGRAM_STATUS__ = False
     else:
         print("No such option available")

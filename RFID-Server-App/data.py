@@ -81,7 +81,8 @@ class EmployeesDataBase:
                 with open(filePath, "r") as file:
                     line = file.readline()
                     while line != "":
-                        entry = tuple([int(item) for item in line.split(';')])
+                        entry = tuple([int(item) for item in line.split(';')[:-1]])
+                        entry += tuple(line.split(';')[-1].strip('\n'))
                         self.__emp_hist_dict[emp_uid].append(entry)
                         line = file.readline()
 
@@ -109,7 +110,7 @@ class EmployeesDataBase:
             return False
         return True
 
-    def addEntry(self, rfid_uid, rfid_terminal=1, date=datetime.datetime.now()):
+    def addEntry(self, rfid_uid, rfid_terminal='terminal', date=datetime.datetime.now()):
         """
         Returns:\n
         \tNone
@@ -132,7 +133,7 @@ class EmployeesDataBase:
 
         # update emp_history dictionary
         self.__emp_hist_dict[emp_uid].append(
-            tuple([int(item) for item in entryText.split(';')]))
+            tuple([date.day, date.month, date.year, date.hour, date.minute, rfid_terminal]))
 
     def addEmployee(self, rfid_uid, emp_uid="", name=""):
         """

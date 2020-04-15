@@ -141,3 +141,4 @@ cython_debug/
 #utility folders
 data/
 reports/
+logs/
