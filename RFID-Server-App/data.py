@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import datetime
 import os
+import threading
 from random import randrange
 
 __DATA_DIR_PATH__ = "./data/"
@@ -39,6 +40,7 @@ class EmployeesDataBase:
         self.__rfid_emp_dict = {}
         self.__emp_rfid_dict = {}
         self.__reload_data()
+        self.__lock = threading.Lock()
 
     def __clear_dictionaries(self):
         self.__emp_hist_dict.clear()
@@ -81,7 +83,8 @@ class EmployeesDataBase:
                 with open(filePath, "r") as file:
                     line = file.readline()
                     while line != "":
-                        entry = tuple([int(item) for item in line.split(';')[:-1]])
+                        entry = tuple([int(item)
+                                       for item in line.split(';')[:-1]])
                         entry += tuple(line.split(';')[-1].strip('\n'))
                         self.__emp_hist_dict[emp_uid].append(entry)
                         line = file.readline()
@@ -119,21 +122,22 @@ class EmployeesDataBase:
         """
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
+        
+        with self.__lock:
+            emp_uid = self.__rfid_emp_dict[rfid_uid]
+            filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
+            if os.path.exists(filePath):
+                file = open(filePath, "a")
+            else:
+                file = open(filePath, "w")
 
-        emp_uid = self.__rfid_emp_dict[rfid_uid]
-        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
-        if os.path.exists(filePath):
-            file = open(filePath, "a")
-        else:
-            file = open(filePath, "w")
+            entryText = f"{date.day};{date.month};{date.year};{date.hour};{date.minute};{rfid_terminal}\n"
+            file.write(entryText)
+            file.close()
 
-        entryText = f"{date.day};{date.month};{date.year};{date.hour};{date.minute};{rfid_terminal}\n"
-        file.write(entryText)
-        file.close()
-
-        # update emp_history dictionary
-        self.__emp_hist_dict[emp_uid].append(
-            tuple([date.day, date.month, date.year, date.hour, date.minute, rfid_terminal]))
+            # update emp_history dictionary
+            self.__emp_hist_dict[emp_uid].append(
+                tuple([date.day, date.month, date.year, date.hour, date.minute, rfid_terminal]))
 
     def addEmployee(self, rfid_uid, emp_uid="", name=""):
         """
@@ -150,24 +154,25 @@ class EmployeesDataBase:
         if rfid_uid in self.__rfid_emp_dict.keys():
             raise RfidAlreadyUsedError
 
-        if emp_uid == "":
-            emp_uid = generateKey(__DEFAULT_KEY_LEN__)
-            while emp_uid in self.__emp_name_dict.keys():
+        with self.__lock:     
+            if emp_uid == "":
                 emp_uid = generateKey(__DEFAULT_KEY_LEN__)
-        elif emp_uid in self.__emp_name_dict.keys():
-            raise EmployeeRecordAlreadyExistsError
+                while emp_uid in self.__emp_name_dict.keys():
+                    emp_uid = generateKey(__DEFAULT_KEY_LEN__)
+            elif emp_uid in self.__emp_name_dict.keys():
+                raise EmployeeRecordAlreadyExistsError
 
-        if os.path.exists(__EMPLOYEES_FILE_PATH__):
-            file = open(__EMPLOYEES_FILE_PATH__, "a")
-        else:
-            file = open(__EMPLOYEES_FILE_PATH__, "w")
+            if os.path.exists(__EMPLOYEES_FILE_PATH__):
+                file = open(__EMPLOYEES_FILE_PATH__, "a")
+            else:
+                file = open(__EMPLOYEES_FILE_PATH__, "w")
 
-        if name == "":
-            name = emp_uid
+            if name == "":
+                name = emp_uid
 
-        file.write(f"{emp_uid};{name};{rfid_uid}\n")
-        file.close()
-        self.__reload_data()
+            file.write(f"{emp_uid};{name};{rfid_uid}\n")
+            file.close()
+            self.__reload_data()
 
     def deleteEmployee(self, rfid_uid, delHistory=True):
         """
@@ -185,26 +190,25 @@ class EmployeesDataBase:
             raise NoSuchEmployeeError
 
         if not os.path.exists(__EMPLOYEES_FILE_PATH__):
-            self.__reload_data()
-            if not os.path.exists(__EMPLOYEES_FILE_PATH__):
-                raise DataBaseError
+            raise DataBaseError
+        
+        with self.__lock:
+            emp_uid = self.__rfid_emp_dict[rfid_uid]
 
-        emp_uid = self.__rfid_emp_dict[rfid_uid]
+            # rewrite file without deleted employee
+            with open(__EMPLOYEES_FILE_PATH__, "r") as file:
+                lines = file.readlines()
+            with open(__EMPLOYEES_FILE_PATH__, "w") as file:
+                for line in lines:
+                    if line.split(';')[0] != emp_uid:
+                        file.write(line)
 
-        # rewrite file without deleted employee
-        with open(__EMPLOYEES_FILE_PATH__, "r") as file:
-            lines = file.readlines()
-        with open(__EMPLOYEES_FILE_PATH__, "w") as file:
-            for line in lines:
-                if line.split(';')[0] != emp_uid:
-                    file.write(line)
+            # delete history file
+            filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
+            if os.path.exists(filePath) and delHistory:
+                os.remove(filePath)
 
-        # delete history file
-        filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
-        if os.path.exists(filePath) and delHistory:
-            os.remove(filePath)
-
-        self.__remove_employee_from_dict(emp_uid)
+            self.__remove_employee_from_dict(emp_uid)
 
     def modifyEmpName(self, rfid_uid, newName):
         """
@@ -220,10 +224,11 @@ class EmployeesDataBase:
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
 
-        emp_uid = self.__rfid_emp_dict[rfid_uid]
+        with self.__lock:
+            emp_uid = self.__rfid_emp_dict[rfid_uid]
 
-        self.deleteEmployee(rfid_uid, delHistory=False)
-        self.addEmployee(rfid_uid, emp_uid=emp_uid, name=newName)
+            self.deleteEmployee(rfid_uid, delHistory=False)
+            self.addEmployee(rfid_uid, emp_uid=emp_uid, name=newName)
 
     def modifyEmpRFID(self, rfid_uid, new_rfid_uid):
         """
@@ -242,12 +247,13 @@ class EmployeesDataBase:
 
         if new_rfid_uid in self.__rfid_emp_dict.keys():
             raise RfidAlreadyUsedError
+        
+        with self.__lock:
+            emp_uid = self.__rfid_emp_dict[rfid_uid]
+            name = self.__emp_name_dict[emp_uid]
 
-        emp_uid = self.__rfid_emp_dict[rfid_uid]
-        name = self.__emp_name_dict[emp_uid]
-
-        self.deleteEmployee(rfid_uid, delHistory=False)
-        self.addEmployee(new_rfid_uid, emp_uid=emp_uid, name=name)
+            self.deleteEmployee(rfid_uid, delHistory=False)
+            self.addEmployee(new_rfid_uid, emp_uid=emp_uid, name=name)
 
     def getEmployeesDataSummary(self, includeHistory=True):
         """
@@ -308,31 +314,32 @@ class EmployeesDataBase:
         if not os.path.exists(__REPORT_DIR_PATH__):
             os.mkdir(__REPORT_DIR_PATH__)
 
-        workDays = []  # date of entrance, date of leave, delta_time
-        isEntrance = True
-        (day, month, year, hour, minute,
-         terminal) = self.__emp_hist_dict[emp_uid][0]
-        prevDate = datetime.datetime(year, month, day, hour, minute)
+        with self.__lock:
+            workDays = []  # date of entrance, date of leave, delta_time
+            isEntrance = True
+            (day, month, year, hour, minute,
+            terminal) = self.__emp_hist_dict[emp_uid][0]
+            prevDate = datetime.datetime(year, month, day, hour, minute)
 
-        for entry in self.__emp_hist_dict[emp_uid][1:]:
-            isEntrance = not isEntrance
-            (day, month, year, hour, minute, terminal) = entry
-            if isEntrance:
-                prevDate = datetime.datetime(year, month, day, hour, minute)
-            else:
-                currentDate = datetime.datetime(year, month, day, hour, minute)
-                workDays.append(
-                    (prevDate, currentDate, (currentDate - prevDate)))
+            for entry in self.__emp_hist_dict[emp_uid][1:]:
+                isEntrance = not isEntrance
+                (day, month, year, hour, minute, terminal) = entry
+                if isEntrance:
+                    prevDate = datetime.datetime(year, month, day, hour, minute)
+                else:
+                    currentDate = datetime.datetime(year, month, day, hour, minute)
+                    workDays.append(
+                        (prevDate, currentDate, (currentDate - prevDate)))
 
-        filePath = f"{__REPORT_DIR_PATH__}" \
-            f"{self.__emp_name_dict[emp_uid].replace(' ', '_')}_" \
-            f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}" \
-            f"{__REPORT_EXTENSION__}"
+            filePath = f"{__REPORT_DIR_PATH__}" \
+                f"{self.__emp_name_dict[emp_uid].replace(' ', '_')}_" \
+                f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}" \
+                f"{__REPORT_EXTENSION__}"
 
-        with open(filePath, "w") as file:
-            for workDay in workDays:
-                file.write(
-                    f"{workDay[0].strftime('%d/%m/%Y')};{workDay[1].strftime('%d/%m/%Y')};{int(workDay[2].total_seconds())}\n")
+            with open(filePath, "w") as file:
+                for workDay in workDays:
+                    file.write(
+                        f"{workDay[0].strftime('%d/%m/%Y')};{workDay[1].strftime('%d/%m/%Y')};{int(workDay[2].total_seconds())}\n")
         return filePath
 
 

@@ -142,3 +142,9 @@ cython_debug/
 data/
 reports/
 logs/
+
+# whitelist file
+whitelist.txt
+
+# vs code
+*.code-workspace

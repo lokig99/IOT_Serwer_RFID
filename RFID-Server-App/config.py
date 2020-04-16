@@ -5,7 +5,10 @@ import RPi.GPIO as GPIO
 # ------------- config ---------------
 
 # mqtt broker
-__BROKER__ = 'localhost'
+__BROKER__ = '127.0.0.1'
+
+# server identificator
+__SERVER_ID__ = 'server'
 
 # ------------------------------------
 

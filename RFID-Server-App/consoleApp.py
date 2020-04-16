@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-import data as d, config, os, time, server
+import data as d, config, os, time, server as serv
 from operator import itemgetter
 
+# The employees database
 database = d.EmployeesDataBase()
+
+# The main loop bool value
 __PROGRAM_STATUS__ = True
 
 def displayMenu():
@@ -31,8 +34,6 @@ def selectOption():
         option = int(input("\nEnter option number: "))
         
     except:
-        print("incorrect input")
-        time.sleep(1)
         return
 
     if option == 1:
@@ -47,9 +48,7 @@ def selectOption():
         pass
     elif option == 6:
         __PROGRAM_STATUS__ = False
-    else:
-        print("No such option available")
-        time.sleep(1)
+
 
 def registerRFID(verbose=True, rfid_uid_non_verbose=0):
     if verbose:
@@ -116,6 +115,7 @@ def scanRFID(registerCard=True, add_entry=True):
 
 
 def generateReport():
+    printEmployeesList()
     print("Select action: ")
     print("[1] Select employee with his name")
     print("[2] Select employee with his UID")
@@ -157,6 +157,7 @@ def generateReport():
     
   
 def main():
+    server = serv.Server(database)
     server.run()
     os.system("cls" if os.name == "nt" else "clear")
     while __PROGRAM_STATUS__:
@@ -164,6 +165,8 @@ def main():
         selectOption()
         os.system("cls" if os.name == "nt" else "clear")
     server.stop()
+    for log in serv.getSessionLogs():
+        print(log)
 
 if __name__ == "__main__":
     main()

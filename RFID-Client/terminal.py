@@ -7,6 +7,7 @@ import logging
 import config
 import keyboard
 import rfid
+import threading
 from datetime import datetime as date
 
 
@@ -15,7 +16,16 @@ client = mqtt.Client()
 
 # MQTT topics
 __TERMINAL_DEBUG__ = 'terminal/debug'
+__SERVER_PING__ = 'server/ping'
+__TERMINAL_PING__ = 'terminal/ping'
 __RFID_RECORD__ = 'rfid/record'
+
+__MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0), (__SERVER_PING__, 0),
+                   (__TERMINAL_PING__, 0), (__RFID_RECORD__, 0)]
+
+# ping consts
+__PING_RESPONSE__ = 1
+__PING_CALL__ = 0
 
 # path of log directory
 __LOGS_DIR__ = "./logs/"
@@ -48,37 +58,67 @@ def __call_server(topic, message, terminal_id):
         f'sent MQTT message: [{topic}] {message}.{terminal_id}')
 
 
+def __process_message(client, userdata, message):
+    message_decoded = (str(message.payload.decode('utf-8'))).split('.')
+
+    if message.topic == __SERVER_PING__:
+        (terminal_id, server_id, ping_status) = message_decoded
+        if terminal_id == config.__TERMINAL_ID__:
+            if int(ping_status) == __PING_CALL__:
+                __ping_server(server_id, __PING_RESPONSE__)
+            else:
+                logging.info(
+                    f'received ping response from server with id: {server_id}')
+
+
+def __ping_server(server_id, status=__PING_CALL__):
+    client.publish(__TERMINAL_PING__, f'{config.__TERMINAL_ID__}.{server_id}.{status}')
+    logging.info(
+        f'published ping message - target server_id: {server_id}')
+
+
 def __connect_to_broker():
     client.connect(config.__BROKER__)
+    client.on_message = __process_message
+    client.loop_start()
+    client.subscribe(__SERVER_PING__)
     logging.info(f'connected to broker: {config.__BROKER__}')
-    __call_server(__TERMINAL_DEBUG__, 'Client connected', config.__TERMINAL_ID__)
+    __call_server(__TERMINAL_DEBUG__, 'Client connected',
+                  config.__TERMINAL_ID__)
+
 
 def __disconnect_from_broker():
-    __call_server(__TERMINAL_DEBUG__, 'Client disconnected', config.__TERMINAL_ID__)
+    __call_server(__TERMINAL_DEBUG__, 'Client disconnected',
+                  config.__TERMINAL_ID__)
     logging.info(f'disconnected from broker: {config.__BROKER__}')
     client.disconnect()
+    client.loop_stop()
 
 
 def __rfid_scan_loop(terminal_id):
     prev_rfid_uid = -1
 
     while True:
-        if keyboard.is_pressed('ctrl + Q'):
-            return
         rfid_uid = rfid.rfidRead()
         if rfid_uid != -1:
             if prev_rfid_uid != rfid_uid:
                 prev_rfid_uid = rfid_uid
-                __call_server(__RFID_RECORD__, f'{rfid_uid}.{date.now().strftime("%d.%m.%Y.%H.%M")}', config.__TERMINAL_ID__)
+                __call_server(
+                    __RFID_RECORD__, f'{rfid_uid}.{date.now().strftime("%d.%m.%Y.%H.%M")}', config.__TERMINAL_ID__)
         else:
             prev_rfid_uid = -1
-        
+
+
 def run():
     __connect_to_broker()
-    __rfid_scan_loop(config.__TERMINAL_ID__)
-    
+    rfid_scanner = threading.Thread(target=__rfid_scan_loop, args=(config.__TERMINAL_ID__, ), daemon=True )
+    rfid_scanner.start()
+
+
 if __name__ == "__main__":
     run()
+    while not keyboard.is_pressed('ctrl + q'):
+        pass
     __disconnect_from_broker()
     logging.info('shutting down terminal...')
-    os.system('cls' if os.name == 'nt' else 'clear')
+    #os.system('cls' if os.name == 'nt' else 'clear')

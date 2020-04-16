@@ -8,7 +8,7 @@ import RPi.GPIO as GPIO
 __TERMINAL_ID__ = 'terminal'
 
 # mqqt broker
-__BROKER__ = 'localhost'
+__BROKER__ = '127.0.0.1'
 
 # ------------------------------------
 
