@@ -19,6 +19,7 @@ __TERMINAL_DEBUG__ = 'terminal/debug'
 __SERVER_PING__ = 'server/ping'
 __TERMINAL_PING__ = 'terminal/ping'
 __RFID_RECORD__ = 'rfid/record'
+__SERVER_BROADCAST__ = 'server/broadcast'
 
 __MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0), (__SERVER_PING__, 0),
                    (__TERMINAL_PING__, 0), (__RFID_RECORD__, 0)]
@@ -69,6 +70,12 @@ def __process_message(client, userdata, message):
             else:
                 logging.info(
                     f'received ping response from server with id: {server_id}')
+    
+    elif message.topic == __SERVER_BROADCAST__:
+        if len(message_decoded) == 1:
+            server_id = message_decoded[0]
+            logging.info(f'received broadcast msg from server with id={server_id}')
+            client.publish(__SERVER_BROADCAST__, f'{config.__TERMINAL_ID__}.{server_id}')
 
 
 def __ping_server(server_id, status=__PING_CALL__):
@@ -81,7 +88,7 @@ def __connect_to_broker():
     client.connect(config.__BROKER__)
     client.on_message = __process_message
     client.loop_start()
-    client.subscribe(__SERVER_PING__)
+    client.subscribe([(__SERVER_PING__, 0), (__SERVER_BROADCAST__, 0)])
     logging.info(f'connected to broker: {config.__BROKER__}')
     __call_server(__TERMINAL_DEBUG__, 'Client connected',
                   config.__TERMINAL_ID__)
@@ -108,6 +115,8 @@ def __rfid_scan_loop(terminal_id):
         else:
             prev_rfid_uid = -1
 
+        time.sleep(0.1) #update once every 100 ms to have mercy on the CPU
+
 
 def run():
     __connect_to_broker()
@@ -118,7 +127,7 @@ def run():
 if __name__ == "__main__":
     run()
     while not keyboard.is_pressed('ctrl + q'):
-        pass
+         time.sleep(0.01) #update once every 10 ms to have mercy on the CPU
     __disconnect_from_broker()
     logging.info('shutting down terminal...')
     #os.system('cls' if os.name == 'nt' else 'clear')

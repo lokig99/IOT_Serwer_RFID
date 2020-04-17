@@ -6,6 +6,7 @@ import logging
 import data
 import config
 import keyboard
+import threading
 from datetime import datetime as date
 
 # MQTT topics
@@ -13,6 +14,7 @@ __TERMINAL_DEBUG__ = 'terminal/debug'
 __SERVER_PING__ = 'server/ping'
 __TERMINAL_PING__ = 'terminal/ping'
 __RFID_RECORD__ = 'rfid/record'
+__SERVER_BROADCAST__ = 'server/broadcast'
 
 __MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0), (__SERVER_PING__, 0),
                    (__TERMINAL_PING__, 0), (__RFID_RECORD__, 0)]
@@ -53,6 +55,80 @@ def getSessionLogs():
         return logs
 
 
+class NetworkScanner:
+    def __init__(self):
+        # The MQTT client.
+        self.__client = mqtt.Client()
+        self.__available_terminals = []
+        self.__stop_broadcast = False
+        self.__time_of_last_broadcast = []
+        self.__broadcast_sender = threading.Thread(target=self.__send_broadcast, args=(
+            lambda: self.__stop_broadcast, self.__time_of_last_broadcast), daemon=True)
+
+    def __str__(self):
+        return self.__class__.__name__
+
+    def __connect_to_broker(self):
+        self.__client.connect(config.__BROKER__)
+        self.__client.on_message = self.__process_broadcast
+        self.__client.loop_start()
+        self.__client.subscribe(__SERVER_BROADCAST__)
+        logging.info(
+            f'[{self}] connected to broker: {config.__BROKER__}')
+
+    def __process_broadcast(self, client, userdata, message):
+        message_decoded = (str(message.payload.decode('utf-8'))).split('.')
+
+        if len(message_decoded) == 2:
+            (terminal_id, server_id) = message_decoded
+            if server_id == config.__SERVER_ID__:
+                if not terminal_id in self.__available_terminals:
+                    self.__available_terminals.append(terminal_id)
+                    logging.info(f'[{self}] terminal with id={terminal_id} found in network')
+
+
+    def __send_broadcast(self, stop, lastBroadcastTracker=[]):
+        interval = config.__BROADCAST_INTERVAL__
+        prev_broadcast = -interval
+
+        while True:
+            now = time.time()
+            if now - prev_broadcast > interval:
+                logging.debug(self.getAvailableTerminals())
+                self.__available_terminals.clear()
+                self.__client.publish(__SERVER_BROADCAST__, config.__SERVER_ID__)
+                prev_broadcast = now
+                lastBroadcastTracker.clear()
+                lastBroadcastTracker.append(now)
+                logging.debug(lastBroadcastTracker)
+                logging.info(f'[{self}] sent network broadcast')
+            if stop():
+                logging.info(f'[{self}] killing broadcast thread')
+                break
+            time.sleep(0.5) #update once every 500 ms to have mercy on the CPU
+
+    def __disconnect_from_broker(self):
+        self.__client.loop_stop()
+        self.__client.disconnect()
+        logging.info(
+            f'[{self}] disconnected from broker: {config.__BROKER__}')
+
+    def getAvailableTerminals(self):
+        return self.__available_terminals[:]
+
+    def getLastBroadcastTime(self):
+        return self.__time_of_last_broadcast[0]
+
+    def run(self):
+        self.__connect_to_broker()
+        self.__broadcast_sender.start()
+
+    def stop(self):
+        self.__disconnect_from_broker()
+        self.__stop_broadcast = True
+        self.__broadcast_sender.join()
+
+
 class Server:
     def __init__(self, dataBase=data.EmployeesDataBase()):
         # The white-list of terminals (terminal IDs)
@@ -61,6 +137,8 @@ class Server:
         self.__database = dataBase
         # The MQTT client.
         self.__server_client = mqtt.Client()
+        # The network scanner
+        self.__networkScanner = NetworkScanner()
 
     def __load_whitelist(self):
         if os.path.exists(__WHITE_LIST_PATH__):
@@ -83,7 +161,8 @@ class Server:
             logging.info('created "whitelist.txt" file')
 
     def __ping_terminal(self, terminal_id, status=__PING_CALL__):
-        self.__server_client.publish(__SERVER_PING__, f'{terminal_id}.{config.__SERVER_ID__}.{status}')
+        self.__server_client.publish(
+            __SERVER_PING__, f'{terminal_id}.{config.__SERVER_ID__}.{status}')
         logging.info(
             f'published ping message - target terminal_id: {terminal_id}')
 
@@ -100,7 +179,8 @@ class Server:
                 if int(ping_status) == __PING_CALL__:
                     self.__ping_terminal(terminal_id, __PING_RESPONSE__)
                 else:
-                    logging.info(f'received ping response from terminal with id: {terminal_id}')
+                    logging.info(
+                        f'received ping response from terminal with id: {terminal_id}')
 
         elif message.topic == __RFID_RECORD__ and message_decoded[-1] in self.__terminals_whitelist:
             (rfid_uid, day, month, year, hour, minute) = [
@@ -172,20 +252,35 @@ class Server:
                 f'removeTerminal - terminal with id={terminal_id} removed from whitelist')
         return True
 
+    def getAvailableTerminals(self):
+        return self.__networkScanner.getAvailableTerminals()
+
+    def getLastBroadcastTime(self):
+        return self.__networkScanner.getLastBroadcastTime()
+
+    def getWhitelist(self):
+        return self.__terminals_whitelist[:]
+
+
     def run(self):
         self.__connect_to_broker()
         self.__load_whitelist()
+        self.__networkScanner.run()
 
     def stop(self):
         self.__disconnect_from_broker()
+        self.__networkScanner.stop()
 
 
 if __name__ == "__main__":
     server = Server()
+    scanner = NetworkScanner()
     server.run()
+    scanner.run()
     server.addTerminal('terminal')
     while not keyboard.is_pressed('q'):
         pass
     server.stop()
+    scanner.stop()
     for log in getSessionLogs():
         print(log)

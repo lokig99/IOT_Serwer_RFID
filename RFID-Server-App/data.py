@@ -224,11 +224,10 @@ class EmployeesDataBase:
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
 
-        with self.__lock:
-            emp_uid = self.__rfid_emp_dict[rfid_uid]
+        emp_uid = self.__rfid_emp_dict[rfid_uid]
 
-            self.deleteEmployee(rfid_uid, delHistory=False)
-            self.addEmployee(rfid_uid, emp_uid=emp_uid, name=newName)
+        self.deleteEmployee(rfid_uid, delHistory=False)
+        self.addEmployee(rfid_uid, emp_uid=emp_uid, name=newName)
 
     def modifyEmpRFID(self, rfid_uid, new_rfid_uid):
         """
@@ -248,12 +247,11 @@ class EmployeesDataBase:
         if new_rfid_uid in self.__rfid_emp_dict.keys():
             raise RfidAlreadyUsedError
         
-        with self.__lock:
-            emp_uid = self.__rfid_emp_dict[rfid_uid]
-            name = self.__emp_name_dict[emp_uid]
+        emp_uid = self.__rfid_emp_dict[rfid_uid]
+        name = self.__emp_name_dict[emp_uid]
 
-            self.deleteEmployee(rfid_uid, delHistory=False)
-            self.addEmployee(new_rfid_uid, emp_uid=emp_uid, name=name)
+        self.deleteEmployee(rfid_uid, delHistory=False)
+        self.addEmployee(new_rfid_uid, emp_uid=emp_uid, name=name)
 
     def getEmployeesDataSummary(self, includeHistory=True):
         """

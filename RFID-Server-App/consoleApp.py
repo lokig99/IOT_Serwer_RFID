@@ -1,172 +1,389 @@
 #!/usr/bin/env python3
-import data as d, config, os, time, server as serv
+import data
+import os
+import time
+import server as serv
+import config
 from operator import itemgetter
 
 # The employees database
-database = d.EmployeesDataBase()
+database = data.EmployeesDataBase()
+
+server = serv.Server(database)
 
 # The main loop bool value
 __PROGRAM_STATUS__ = True
 
-def displayMenu():
-    print("--- Console RFID server Menu ---\n")
-    print("[1] Connect new terminal to server")
-    print("[2] Remove connected terminal")
-    print("[3] Register new RFID card for new/current employee")
-    #print("[4] remove RFID card")
-    #print("[5] scan RFID")
-    print("[4] generate report for employee")
-    print("[5] enter server-log mode")
-    print("[6] Stop server and exit")
 
-def printEmployeesList():
+def clrScreen():
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def endMainLoop():
+    print('exiting program...')
+    global __PROGRAM_STATUS__
+    __PROGRAM_STATUS__ = False
+
+
+def _get_employees_summary_sorted():
     emp_data = database.getEmployeesDataSummary(includeHistory=False)
     emp_data.sort(key=itemgetter(1))
     emp_data.sort(key=lambda tup: tup[0] == tup[1])
+    return emp_data
+
+
+def _print_employees_list():
+    emp_data = _get_employees_summary_sorted()
 
     for index, emp in enumerate(emp_data, 1):
         print(f"[{index}] {emp[1]} ({emp[2]}, {emp[0]})")
 
-def selectOption():
-    global __PROGRAM_STATUS__
 
+def _selectOption(options=tuple()):
     try:
-        option = int(input("\nEnter option number: "))
-        
+        option_num = int(input("\nEnter option number: "))
     except:
         return
 
-    if option == 1:
-        print("Option not implemented in this version")
-    elif option == 2:
-        print("Option not implemented in this version")
-    elif option == 3:
-        registerRFID()
-    elif option == 4:
-        generateReport()
-    elif option == 5:
-        pass
-    elif option == 6:
-        __PROGRAM_STATUS__ = False
+    for num, option in enumerate(options, 1):
+        if num != option_num:
+            continue
+        option()
+        break
 
 
-def registerRFID(verbose=True, rfid_uid_non_verbose=0):
-    if verbose:
-        name = input("Enter employee name: ")
-        rfid_uid = RFIDsubMenu()
-    else:
-        rfid_uid = rfid_uid_non_verbose
-        name = str(rfid_uid)
-    
-    try:
-        database.addEmployee(rfid_uid, name=name)
-        print(f"New employee named {name} registered with rfid-uid = {rfid_uid}")
-    except d.InvalidInputDataError:
-        print("ERROR: Invalid input format!\nMake sure name does not contain ';' characters")
-        return
-    except d.RfidAlreadyUsedError:
-        print(f"ERROR: Given card is already used by employee named {database.getEmpName(rfid_uid)}")
-        return
+def _selectList(positions, fun, *args, printList=True):
+    if len(positions) > 0:
+        if printList:
+            for num, position in enumerate(positions, 1):
+                print(f'[{num}] {position}')
 
-def removeRFID():
-    rfid_uid = RFIDsubMenu()
-
-    if rfid_uid in data.rfid_emp_dict.keys():
-        emp_uid = data.rfid_emp_dict[rfid_uid]
-        data.modifyEmpRFID(emp_uid, 0)
-        print(f"Removed RFID card for employee named {data.emp_name_dict[emp_uid]} (employee-uid='{emp_uid}')")
-    else:
-        print(f"ERROR: No such RFID card UID in database as: {rfid_uid}")
-
-def RFIDsubMenu():
-    print("Select action: ")
-    print("[1] Enter RFID card UID")
-    print("[2] Scan RFID card")
-    print("[3] go back to main menu")
-    try:
-        option = int(input("Enter option number: "))
-    except:
-        print("incorrect input")
-        registerRFID()
-
-    if option == 1:
         try:
-            rfid_uid = int(input("Enter RFID card UID: "))
-            return rfid_uid
+            pos_num = int(input("\nEnter position number: ")) - 1
         except:
-            print("incorrect input")
-            registerRFID()
-    elif option == 2:
-        return scanRFID(registerCard=False, add_entry=False)
-    else:
-        return
+            return (None, None)
 
-def scanRFID(registerCard=True, add_entry=True):
-    print("put your card on the reader")
-    rfid_uid = rfid.rfidRead()
-    if add_entry:
-        if rfid_uid in data.rfid_emp_dict.keys():
-            emp_uid = data.rfid_emp_dict[rfid_uid]
-            data.addEntry(emp_uid)
-            print(f"Added new entry for employee named {data.emp_name_dict[emp_uid]} (employee-uid='{emp_uid}')")
+        if pos_num < len(positions):
+            if fun != None:
+                res = fun(positions[pos_num], *args)
+                return (positions[pos_num], res)
+            else:
+                return (positions[pos_num], None)
+
+    return (None, None)
+
+
+def mainMenu():
+    clrScreen()
+    print('MQTT Broker address:', config.__BROKER__,
+          '\tServer ID:', config.__SERVER_ID__)
+    print("\n--- Console RFID server Menu ---\n")
+    print("[1] Manage terminals")
+    print("[2] Manage employees")
+    print("[3] Show server logs")
+    print("[4] Stop server and quit")
+
+    _selectOption(options=_mainMenuOptions)
+
+
+def manageTerminalsMenu():
+    clrScreen()
+    print('(<-- main-menu)')
+    print('\n--- Manage terminals ---\n')
+    print("[1] Add terminal to whitelist")
+    print("[2] Remove terminal from whitelist")
+    print("[3] Show terminals on whitelist")
+    print("[4] Show terminals available on network")
+    print('[5] Return to main-menu')
+
+    _selectOption(options=_manageTerminalsMenuOptions)
+
+
+def manageEmployeesMenu():
+    clrScreen()
+    print('(<-- main-menu)')
+    print('\n--- Manage employees ---\n')
+    print("[1] Show list of all registered employees")
+    print("[2] Add new employee to database")
+    print("[3] Delete an employee from database")
+    print("[4] Modify an employee's data")
+    print("[5] Generate report for an employee")
+    print('[6] Return to main-menu')
+
+    _selectOption(options=_manageEmployeesMenuOptions)
+
+
+def modifyEmpDataMenu():
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print("\n--- Modify an employee's data ---\n")
+    print("[1] Change name")
+    print("[2] Change RFID card")
+    print('[3] Return to previous menu')
+
+    _selectOption(options=_modifyEmpDataMenuOptions)
+
+
+def showServerLogs():
+    clrScreen()
+    for log in serv.getSessionLogs():
+        print(log)
+    input('\n\n--- press enter to return to main-menu ---')
+
+
+def addTerminal():
+    clrScreen()
+    print('--- Add new terminal to white-list ---\n')
+    terminal_id = input('Enter identifier of terminal you want to add:\n')
+    if server.addTerminal(terminal_id):
+        print(f'Added new terminal with id={terminal_id} to whitelist')
+    else:
+        print(f'Terminal with id={terminal_id} is already on whitelist')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageTerminalsMenu()
+
+
+def removeTerminal():
+    clrScreen()
+    print('--- Remove terminal from white-list ---\n')
+
+    terminals = server.getWhitelist()
+    if len(terminals) < 1:
+        print('--- No terminals on whitelist ---')
+    else:
+        result = _selectList(terminals, server.removeTerminal)
+        if result != (None, None):
+            (terminal_id, res) = result
+            if res:
+                print(f'Removed terminal with id={terminal_id} from whitelist')
         else:
-            registerRFID(verbose=False, rfid_uid_non_verbose=rfid_uid)
-    return rfid_uid
+            print(f'--- invalid input ---')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageTerminalsMenu()
+
+
+def showTerminalsNet():
+    clrScreen()
+    print('--- Terminals on network ---\n')
+
+    terminals = server.getAvailableTerminals()
+
+    if len(terminals) > 0:
+        id_len = list(map(len, terminals))
+
+        for terminal_id in terminals:
+            sep = '     '
+            for i in range(max(id_len) - len(terminal_id)):
+                sep += ' '
+
+            print(terminal_id,
+                  f'[on whitelist = {terminal_id in server.getWhitelist()}]', sep=sep)
+    else:
+        print('--- No terminals found in previous scan ---')
+        print('Try again after next scan (server broadcast interval)')
+
+    print(
+        f'\n\nNext network scan in {config.__BROADCAST_INTERVAL__ - round(time.time() - server.getLastBroadcastTime())} seconds from now')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageTerminalsMenu()
+
+
+def showTerminalsWhitelist():
+    clrScreen()
+    print('--- Terminals on white-list ---\n')
+
+    terminals = server.getWhitelist()
+
+    if len(terminals) > 0:
+        id_len = list(map(len, terminals))
+
+        for terminal_id in terminals:
+            sep = '     '
+            for i in range(max(id_len) - len(terminal_id)):
+                sep += ' '
+
+            print(
+                terminal_id, f'[isAvailable: {terminal_id in server.getAvailableTerminals()}]', sep=sep)
+    else:
+        print('--- No terminals on whitelist ---')
+
+    print(
+        f'\n\nNext network scan in {config.__BROADCAST_INTERVAL__ - round(time.time() - server.getLastBroadcastTime())} seconds from now',
+        '(isAvailable status)')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageTerminalsMenu()
+
+
+def showEmployees():
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print('\n--- Employees in database ---\n')
+
+    _print_employees_list()
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageEmployeesMenu()
+
+
+def addEmployee():
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print('\n--- Add Employee to database ---\n')
+
+    emp_name = input('Enter name of the employee you want to add:\n')
+    if emp_name.strip(' ') != '':
+        while True:
+            try:
+                rfid_uid = int(input('Enter RFID card identifier:\n'))
+            except:
+                print('--- invalid input (RFID UID can only contain digits)---')
+                continue
+            break
+
+        try:
+            database.addEmployee(rfid_uid, name=emp_name)
+            print(f'added new employee named {emp_name} to database')
+            print(f'registered new RFID card with UID: {rfid_uid}')
+        except data.InvalidInputDataError:
+            print('--- invalid input (check if name does not contain ";" signs)')
+        except data.RfidAlreadyUsedError:
+            print(
+                f'given RFID UID is already used by the employee named {database.getEmpName(rfid_uid)}')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageEmployeesMenu()
+
+
+def removeEmployee():
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print('\n--- Remove an Employee from database ---\n')
+
+    _print_employees_list()
+    (emp_data, res) = _selectList(
+        _get_employees_summary_sorted(), None, printList=False)
+    if emp_data != None:
+        rfid_uid = emp_data[2]
+        try:
+            database.deleteEmployee(rfid_uid)
+            print(f'removed employee named {emp_data[1]} from database')
+            print(f'unregistered RFID card with UID: {rfid_uid}')
+        except data.DataBaseError:
+            print(f'--- uknown database error ---')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageEmployeesMenu()
 
 
 def generateReport():
-    printEmployeesList()
-    print("Select action: ")
-    print("[1] Select employee with his name")
-    print("[2] Select employee with his UID")
-    print("[3] go back to main menu")
-    option = 3
-    try:
-        option = int(input("Enter option number: "))
-    except:
-         print("incorrect input")
-         generateReport()
-    
-    if option == 1:
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print('\n--- Generate report for an employee ---\n')
+
+    _print_employees_list()
+    (emp_data, res) = _selectList(
+        _get_employees_summary_sorted(), None, printList=False)
+    if emp_data != None:
+        rfid_uid = emp_data[2]
         try:
-            name = input("Enter employees name: ")
-        except:
-            print("incorrect input")
-            registerRFID()
+            path = database.generateReport(rfid_uid)
+            print('generated report')
+            print(f'path to file: {path}')
+        except data.NoDataError:
+            print(f'selected employee has no entries yet')
 
-        if name in data.name_emp_dict.keys():
-            emp_uid = data.name_emp_dict[name]
-        else:
-            print(f"ERROR: No such employee named {name} in database")
-            return
+    input('\n\n--- press enter to return to previous menu ---')
+    manageEmployeesMenu()
 
-    elif option == 2:
-        emp_uid = input("Enter employees uid: ")
-        if emp_uid not in data.emp_name_dict.keys():
-            print(f"ERROR: No such employee with UID={emp_uid} in database")
-            return
-    else:
-        return
 
-    try:
-        filePath = data.generateReport(emp_uid)
-        print(f"Generated new report for employee named {data.emp_name_dict[emp_uid]} (employee-uid='{emp_uid}')")
-        print(f"file path: {filePath}")
-    except data.NoDataError:
-        print(f"User has no entries")
-    
-  
+def modifyRFID():
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print('\n--- change employee\'s RFID card ---\n')
+
+    _print_employees_list()
+    (emp_data, res) = _selectList(
+        _get_employees_summary_sorted(), None, printList=False)
+    if emp_data != None:
+        rfid_uid = emp_data[2]
+
+        while True:
+            try:
+                new_rfid_uid = int(input('Enter new RFID card identifier:\n'))
+                new_rfid_uid = abs(new_rfid_uid)
+            except:
+                print('--- invalid input (RFID UID can only contain digits) ---')
+                continue
+            break
+
+        try:
+            database.modifyEmpRFID(rfid_uid, new_rfid_uid)
+            print(
+                f'{emp_data[1]}\'s RFID card updated with new UID: {new_rfid_uid}')
+            print(f'unregistered RFID card with UID: {rfid_uid}')
+        except data.RfidAlreadyUsedError:
+            print(
+                f'given RFID card with UID: {new_rfid_uid} is already used by employee named {database.getEmpName(new_rfid_uid)}')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageEmployeesMenu()
+
+
+def modifyName():
+    clrScreen()
+    print('(<-- manage employees menu)')
+    print('\n--- change employee\'s name ---\n')
+
+    _print_employees_list()
+    (emp_data, res) = _selectList(
+        _get_employees_summary_sorted(), None, printList=False)
+    if emp_data != None:
+        rfid_uid = emp_data[2]
+
+        emp_name = input('Enter new name for the employee:\n')
+        if emp_name.strip(' ') != '':
+            try:
+                database.modifyEmpName(rfid_uid, emp_name)
+                print(f'{emp_data[1]}\'s name changed to: {emp_name}')
+            except data.InvalidInputDataError:
+                print('--- invalid input (check if name does not contain ";" signs)')
+
+    input('\n\n--- press enter to return to previous menu ---')
+    manageEmployeesMenu()
+
+
+# The main-menu options
+_mainMenuOptions = (manageTerminalsMenu, manageEmployeesMenu,
+                    showServerLogs, endMainLoop)
+
+# The manage terminals menu options
+_manageTerminalsMenuOptions = (
+    addTerminal, removeTerminal, showTerminalsWhitelist, showTerminalsNet, mainMenu)
+
+# The manage employees menu options
+_manageEmployeesMenuOptions = (
+    showEmployees, addEmployee, removeEmployee, modifyEmpDataMenu, generateReport, mainMenu)
+
+# The modify employee's data menu options
+_modifyEmpDataMenuOptions = (modifyName, modifyRFID, manageEmployeesMenu)
+
+
 def main():
-    server = serv.Server(database)
     server.run()
-    os.system("cls" if os.name == "nt" else "clear")
+
     while __PROGRAM_STATUS__:
-        displayMenu()
-        selectOption()
-        os.system("cls" if os.name == "nt" else "clear")
+        mainMenu()
     server.stop()
-    for log in serv.getSessionLogs():
-        print(log)
+
+    clrScreen()
+    if config.__SHOW_LOG_ON_EXIT__:
+        for log in serv.getSessionLogs():
+            print(log)
+
 
 if __name__ == "__main__":
     main()
