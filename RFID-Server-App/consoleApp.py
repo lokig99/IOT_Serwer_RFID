@@ -2,14 +2,15 @@
 import data
 import os
 import time
-import server as serv
+import server as srv
 import config
 from operator import itemgetter
 
 # The employees database
 database = data.EmployeesDataBase()
 
-server = serv.Server(database)
+# The MQTT server
+server = srv.Server(database)
 
 # The main loop bool value
 __PROGRAM_STATUS__ = True
@@ -35,14 +36,22 @@ def _get_employees_summary_sorted():
 def _print_employees_list():
     emp_data = _get_employees_summary_sorted()
 
+    max_name_len = max(list(map(len, [item[1] for item in emp_data])))
+
     for index, emp in enumerate(emp_data, 1):
-        print(f"[{index}] {emp[1]} ({emp[2]}, {emp[0]})")
+        sep = '     '
+        for i in range(max_name_len - len(emp[1])):
+            sep += ' '
+
+        print(f"[{index}] {emp[1]}", f"({emp[2]}, {emp[0]})", sep=sep)
 
 
-def _selectOption(options=tuple()):
+def _selectOption(options=tuple(), on_except=None):
     try:
         option_num = int(input("\nEnter option number: "))
     except:
+        if on_except != None:
+            on_except()
         return
 
     for num, option in enumerate(options, 1):
@@ -63,12 +72,13 @@ def _selectList(positions, fun, *args, printList=True):
         except:
             return (None, None)
 
-        if pos_num < len(positions):
-            if fun != None:
-                res = fun(positions[pos_num], *args)
-                return (positions[pos_num], res)
-            else:
-                return (positions[pos_num], None)
+        if pos_num >= 0:
+            if pos_num < len(positions):
+                if fun != None:
+                    res = fun(positions[pos_num], *args)
+                    return (positions[pos_num], res)
+                else:
+                    return (positions[pos_num], None)
 
     return (None, None)
 
@@ -121,24 +131,29 @@ def modifyEmpDataMenu():
     print("[2] Change RFID card")
     print('[3] Return to previous menu')
 
-    _selectOption(options=_modifyEmpDataMenuOptions)
+    _selectOption(options=_modifyEmpDataMenuOptions, on_except=manageEmployeesMenu)
 
 
 def showServerLogs():
     clrScreen()
-    for log in serv.getSessionLogs():
-        print(log)
+    if config.__LOGGING_ENABLED__:
+        for log in srv.getSessionLogs():
+            print(log)
+    else:
+        print('\t--- logging disabled ---')
     input('\n\n--- press enter to return to main-menu ---')
 
 
 def addTerminal():
     clrScreen()
-    print('--- Add new terminal to white-list ---\n')
+    print('(<-- manage terminals menu)')
+    print('\n--- Add new terminal to white-list ---\n')
     terminal_id = input('Enter identifier of terminal you want to add:\n')
-    if server.addTerminal(terminal_id):
-        print(f'Added new terminal with id={terminal_id} to whitelist')
-    else:
-        print(f'Terminal with id={terminal_id} is already on whitelist')
+    if terminal_id.strip(' ') != '':
+        if server.addTerminal(terminal_id):
+            print(f'Added new terminal with id={terminal_id} to whitelist')
+        else:
+            print(f'Terminal with id={terminal_id} is already on whitelist')
 
     input('\n\n--- press enter to return to previous menu ---')
     manageTerminalsMenu()
@@ -146,7 +161,8 @@ def addTerminal():
 
 def removeTerminal():
     clrScreen()
-    print('--- Remove terminal from white-list ---\n')
+    print('(<-- manage terminals menu)')
+    print('\n--- Remove terminal from white-list ---\n')
 
     terminals = server.getWhitelist()
     if len(terminals) < 1:
@@ -158,7 +174,7 @@ def removeTerminal():
             if res:
                 print(f'Removed terminal with id={terminal_id} from whitelist')
         else:
-            print(f'--- invalid input ---')
+            print(f'\n--- no terminal selected ---')
 
     input('\n\n--- press enter to return to previous menu ---')
     manageTerminalsMenu()
@@ -166,7 +182,8 @@ def removeTerminal():
 
 def showTerminalsNet():
     clrScreen()
-    print('--- Terminals on network ---\n')
+    print('(<-- manage terminals menu)')
+    print('\n--- Terminals on network ---\n')
 
     terminals = server.getAvailableTerminals()
 
@@ -193,7 +210,8 @@ def showTerminalsNet():
 
 def showTerminalsWhitelist():
     clrScreen()
-    print('--- Terminals on white-list ---\n')
+    print('(<-- manage terminals menu)')
+    print('\n--- Terminals on white-list ---\n')
 
     terminals = server.getWhitelist()
 
@@ -314,7 +332,6 @@ def modifyRFID():
         while True:
             try:
                 new_rfid_uid = int(input('Enter new RFID card identifier:\n'))
-                new_rfid_uid = abs(new_rfid_uid)
             except:
                 print('--- invalid input (RFID UID can only contain digits) ---')
                 continue
@@ -328,6 +345,9 @@ def modifyRFID():
         except data.RfidAlreadyUsedError:
             print(
                 f'given RFID card with UID: {new_rfid_uid} is already used by employee named {database.getEmpName(new_rfid_uid)}')
+        except data.InvalidInputDataError:
+            print('invalid input - RFID UID cannot be negative')
+
 
     input('\n\n--- press enter to return to previous menu ---')
     manageEmployeesMenu()
@@ -381,7 +401,7 @@ def main():
 
     clrScreen()
     if config.__SHOW_LOG_ON_EXIT__:
-        for log in serv.getSessionLogs():
+        for log in srv.getSessionLogs():
             print(log)
 
 

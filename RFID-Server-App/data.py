@@ -85,7 +85,7 @@ class EmployeesDataBase:
                     while line != "":
                         entry = tuple([int(item)
                                        for item in line.split(';')[:-1]])
-                        entry += tuple(line.split(';')[-1].strip('\n'))
+                        entry += tuple([line.split(';')[-1].strip('\n')])
                         self.__emp_hist_dict[emp_uid].append(entry)
                         line = file.readline()
 
@@ -122,7 +122,7 @@ class EmployeesDataBase:
         """
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
-        
+
         with self.__lock:
             emp_uid = self.__rfid_emp_dict[rfid_uid]
             filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
@@ -154,7 +154,7 @@ class EmployeesDataBase:
         if rfid_uid in self.__rfid_emp_dict.keys():
             raise RfidAlreadyUsedError
 
-        with self.__lock:     
+        with self.__lock:
             if emp_uid == "":
                 emp_uid = generateKey(__DEFAULT_KEY_LEN__)
                 while emp_uid in self.__emp_name_dict.keys():
@@ -191,7 +191,7 @@ class EmployeesDataBase:
 
         if not os.path.exists(__EMPLOYEES_FILE_PATH__):
             raise DataBaseError
-        
+
         with self.__lock:
             emp_uid = self.__rfid_emp_dict[rfid_uid]
 
@@ -246,7 +246,7 @@ class EmployeesDataBase:
 
         if new_rfid_uid in self.__rfid_emp_dict.keys():
             raise RfidAlreadyUsedError
-        
+
         emp_uid = self.__rfid_emp_dict[rfid_uid]
         name = self.__emp_name_dict[emp_uid]
 
@@ -306,7 +306,7 @@ class EmployeesDataBase:
 
         emp_uid = self.__rfid_emp_dict[rfid_uid]
 
-        if len(self.__emp_hist_dict[emp_uid]) == 0:
+        if len(self.__emp_hist_dict[emp_uid]) < 1:
             raise NoDataError
 
         if not os.path.exists(__REPORT_DIR_PATH__):
@@ -316,16 +316,18 @@ class EmployeesDataBase:
             workDays = []  # date of entrance, date of leave, delta_time
             isEntrance = True
             (day, month, year, hour, minute,
-            terminal) = self.__emp_hist_dict[emp_uid][0]
+             terminal) = self.__emp_hist_dict[emp_uid][0]
             prevDate = datetime.datetime(year, month, day, hour, minute)
 
             for entry in self.__emp_hist_dict[emp_uid][1:]:
                 isEntrance = not isEntrance
                 (day, month, year, hour, minute, terminal) = entry
                 if isEntrance:
-                    prevDate = datetime.datetime(year, month, day, hour, minute)
+                    prevDate = datetime.datetime(
+                        year, month, day, hour, minute)
                 else:
-                    currentDate = datetime.datetime(year, month, day, hour, minute)
+                    currentDate = datetime.datetime(
+                        year, month, day, hour, minute)
                     workDays.append(
                         (prevDate, currentDate, (currentDate - prevDate)))
 

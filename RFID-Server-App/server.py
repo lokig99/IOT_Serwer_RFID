@@ -5,23 +5,15 @@ import time
 import logging
 import data
 import config
-import keyboard
 import threading
 from datetime import datetime as date
 
 # MQTT topics
 __TERMINAL_DEBUG__ = 'terminal/debug'
-__SERVER_PING__ = 'server/ping'
-__TERMINAL_PING__ = 'terminal/ping'
 __RFID_RECORD__ = 'rfid/record'
 __SERVER_BROADCAST__ = 'server/broadcast'
 
-__MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0), (__SERVER_PING__, 0),
-                   (__TERMINAL_PING__, 0), (__RFID_RECORD__, 0)]
-
-# ping consts
-__PING_RESPONSE__ = 1
-__PING_CALL__ = 0
+__MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0), (__RFID_RECORD__, 0)]
 
 # path to whitelist file
 __WHITE_LIST_PATH__ = './whitelist.txt'
@@ -33,10 +25,18 @@ __LOGS_DIR__ = "./logs/"
 __SESSION_LOG_PATH__ = f"{__LOGS_DIR__}{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
 
 # logger configuration
-if not os.path.exists(__LOGS_DIR__):
-    os.mkdir(__LOGS_DIR__)
-logging.basicConfig(filename=__SESSION_LOG_PATH__, filemode='w',
-                    format='[%(asctime)s][%(levelname)s] %(message)s', level=logging.DEBUG, datefmt='%d-%m-%Y %H:%M:%S')
+if config.__LOGGING_ENABLED__:
+    if not os.path.exists(__LOGS_DIR__):
+        os.mkdir(__LOGS_DIR__)
+    if config.__DEBUG_MODE__:
+        logLevel = logging.DEBUG
+    else:
+        logLevel = logging.INFO
+
+    logging.basicConfig(filename=__SESSION_LOG_PATH__, filemode='w',
+                        format='[%(asctime)s][%(levelname)s] %(message)s', level=logLevel, datefmt='%d-%m-%Y %H:%M:%S')
+else:
+    logging.disable(logging.CRITICAL)
 
 
 def getSessionLogs():
@@ -45,7 +45,7 @@ def getSessionLogs():
     \tlist(str) logs
     """
     logs = []
-    if not os.path.exists(__LOGS_DIR__):
+    if not os.path.exists(__SESSION_LOG_PATH__):
         return logs
 
     with open(__SESSION_LOG_PATH__, 'r') as logfile:
@@ -62,7 +62,7 @@ class NetworkScanner:
         self.__available_terminals = []
         self.__stop_broadcast = False
         self.__time_of_last_broadcast = []
-        self.__broadcast_sender = threading.Thread(target=self.__send_broadcast, args=(
+        self.__broadcast_sender = threading.Thread(target=self.__broadcast_loop, args=(
             lambda: self.__stop_broadcast, self.__time_of_last_broadcast), daemon=True)
 
     def __str__(self):
@@ -84,10 +84,10 @@ class NetworkScanner:
             if server_id == config.__SERVER_ID__:
                 if not terminal_id in self.__available_terminals:
                     self.__available_terminals.append(terminal_id)
-                    logging.info(f'[{self}] terminal with id={terminal_id} found in network')
+                    logging.info(
+                        f'[{self}] terminal with id={terminal_id} found in network')
 
-
-    def __send_broadcast(self, stop, lastBroadcastTracker=[]):
+    def __broadcast_loop(self, stop, lastBroadcastTracker=[]):
         interval = config.__BROADCAST_INTERVAL__
         prev_broadcast = -interval
 
@@ -96,7 +96,8 @@ class NetworkScanner:
             if now - prev_broadcast > interval:
                 logging.debug(self.getAvailableTerminals())
                 self.__available_terminals.clear()
-                self.__client.publish(__SERVER_BROADCAST__, config.__SERVER_ID__)
+                self.__client.publish(
+                    __SERVER_BROADCAST__, config.__SERVER_ID__)
                 prev_broadcast = now
                 lastBroadcastTracker.clear()
                 lastBroadcastTracker.append(now)
@@ -105,7 +106,8 @@ class NetworkScanner:
             if stop():
                 logging.info(f'[{self}] killing broadcast thread')
                 break
-            time.sleep(0.5) #update once every 500 ms to have mercy on the CPU
+            # update once every 500 ms to have mercy on the CPU
+            time.sleep(0.5)
 
     def __disconnect_from_broker(self):
         self.__client.loop_stop()
@@ -152,7 +154,6 @@ class Server:
                         self.__terminals_whitelist.append(line)
                         logging.info(
                             f'added terminal with id={line} to terminal-whitelist')
-                        self.__ping_terminal(line)
                     logging.info(
                         '--- finished loading terminal-IDs from whitelist file ---')
         else:
@@ -160,27 +161,12 @@ class Server:
             file.close()
             logging.info('created "whitelist.txt" file')
 
-    def __ping_terminal(self, terminal_id, status=__PING_CALL__):
-        self.__server_client.publish(
-            __SERVER_PING__, f'{terminal_id}.{config.__SERVER_ID__}.{status}')
-        logging.info(
-            f'published ping message - target terminal_id: {terminal_id}')
-
     def __process_message(self, client, userdata, message):
         message_decoded = (str(message.payload.decode('utf-8'))).split('.')
 
         if message.topic == __TERMINAL_DEBUG__:
             logging.info(
                 f'(Terminal-id: {message_decoded[1]}) {message_decoded[0]}')
-
-        elif message.topic == __TERMINAL_PING__:
-            (terminal_id, server_id, ping_status) = message_decoded
-            if server_id == config.__SERVER_ID__:
-                if int(ping_status) == __PING_CALL__:
-                    self.__ping_terminal(terminal_id, __PING_RESPONSE__)
-                else:
-                    logging.info(
-                        f'received ping response from terminal with id: {terminal_id}')
 
         elif message.topic == __RFID_RECORD__ and message_decoded[-1] in self.__terminals_whitelist:
             (rfid_uid, day, month, year, hour, minute) = [
@@ -261,7 +247,6 @@ class Server:
     def getWhitelist(self):
         return self.__terminals_whitelist[:]
 
-
     def run(self):
         self.__connect_to_broker()
         self.__load_whitelist()
@@ -278,8 +263,12 @@ if __name__ == "__main__":
     server.run()
     scanner.run()
     server.addTerminal('terminal')
-    while not keyboard.is_pressed('q'):
-        pass
+    
+    while True:
+        inp = input('enter "q" to exit\n')
+        if inp == 'q':
+            break
+
     server.stop()
     scanner.stop()
     for log in getSessionLogs():
