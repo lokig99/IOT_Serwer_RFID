@@ -36,14 +36,15 @@ def _get_employees_summary_sorted():
 def _print_employees_list():
     emp_data = _get_employees_summary_sorted()
 
-    max_name_len = max(list(map(len, [item[1] for item in emp_data])))
+    if len(emp_data) > 0:
+        max_name_len = max(list(map(len, [item[1] for item in emp_data])))
 
-    for index, emp in enumerate(emp_data, 1):
-        sep = '     '
-        for i in range(max_name_len - len(emp[1])):
-            sep += ' '
+        for index, emp in enumerate(emp_data, 1):
+            sep = '     '
+            for i in range(max_name_len - len(emp[1])):
+                sep += ' '
 
-        print(f"[{index}] {emp[1]}", f"({emp[2]}, {emp[0]})", sep=sep)
+            print(f"[{index}] {emp[1]}", f"({emp[2]}, {emp[0]})", sep=sep)
 
 
 def _selectOption(options=tuple(), on_except=None):
