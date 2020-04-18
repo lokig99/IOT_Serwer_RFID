@@ -21,8 +21,8 @@ def clrScreen():
 
 
 def endMainLoop():
-    print('exiting program...')
     global __PROGRAM_STATUS__
+    print('exiting program...')
     __PROGRAM_STATUS__ = False
 
 
@@ -310,7 +310,7 @@ def generateReport():
         try:
             path = database.generateReport(rfid_uid)
             print('generated report')
-            print(f'path to file: {path}')
+            print(f'path to file: {os.path.abspath(path)}')
         except data.NoDataError:
             print(f'selected employee has no entries yet')
 

@@ -306,7 +306,7 @@ class EmployeesDataBase:
 
         emp_uid = self.__rfid_emp_dict[rfid_uid]
 
-        if len(self.__emp_hist_dict[emp_uid]) < 1:
+        if len(self.__emp_hist_dict[emp_uid]) < 2: # at least two entries needed
             raise NoDataError
 
         if not os.path.exists(__REPORT_DIR_PATH__):
