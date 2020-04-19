@@ -8,6 +8,7 @@ import config
 import keyboard
 import rfid
 import threading
+from zipfile import ZipFile, ZIP_BZIP2
 from datetime import datetime as date
 
 
@@ -22,11 +23,8 @@ __SERVER_BROADCAST__ = 'server/broadcast'
 __MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0),
                    (__RFID_RECORD__, 0)]
 
-# path of log directory
-__LOGS_DIR__ = "./logs/"
-
 # path to current session log
-__SESSION_LOG_PATH__ = f"{__LOGS_DIR__}{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
+__SESSION_LOG_PATH__ = f"{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
 
 # logger configuration
 logFormatter = logging.Formatter(
@@ -34,8 +32,6 @@ logFormatter = logging.Formatter(
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.DEBUG)
 
-if not os.path.exists(__LOGS_DIR__):
-    os.mkdir(__LOGS_DIR__)
 fileHandler = logging.FileHandler(__SESSION_LOG_PATH__, 'w')
 fileHandler.setFormatter(logFormatter)
 rootLogger.addHandler(fileHandler)
@@ -63,6 +59,7 @@ def __process_message(client, userdata, message):
                 f'received broadcast msg from server with id={server_id}')
             client.publish(__SERVER_BROADCAST__,
                            f'{config.__TERMINAL_ID__}.{server_id}')
+
 
 def __connect_to_broker():
     client.connect(config.__BROKER__)
@@ -95,7 +92,7 @@ def __rfid_scan_loop(terminal_id):
         else:
             prev_rfid_uid = -1
 
-        time.sleep(0.1)  # update once every 100 ms to have mercy on the CPU
+        time.sleep(0.01)  # update once every 10 ms to have mercy on the CPU
 
 
 def run():
@@ -111,7 +108,17 @@ if __name__ == "__main__":
         inp = input('enter "stop" to exit\n')
         if inp.lower() == 'stop':
             break
-        
+
     __disconnect_from_broker()
     logging.info('shutting down terminal...')
+    logging.shutdown()
+
+    if not os.path.exists('logs.zip'):
+        with ZipFile('logs.zip', 'w', ZIP_BZIP2) as ziplog:
+            ziplog.write(__SESSION_LOG_PATH__)
+    else:
+        with ZipFile('logs.zip', 'a', ZIP_BZIP2) as ziplog:
+            ziplog.write(__SESSION_LOG_PATH__)
+
+    os.remove(__SESSION_LOG_PATH__)
     #os.system('cls' if os.name == 'nt' else 'clear')

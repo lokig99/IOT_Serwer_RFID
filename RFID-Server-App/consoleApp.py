@@ -4,6 +4,8 @@ import os
 import time
 import server as srv
 import config
+from zipfile import ZipFile, ZIP_BZIP2
+import bz2
 from operator import itemgetter
 
 # The employees database
@@ -150,7 +152,7 @@ def addTerminal():
     print('(<-- manage terminals menu)')
     print('\n--- Add new terminal to white-list ---\n')
     terminal_id = input('Enter identifier of terminal you want to add:\n')
-    if terminal_id.strip(' ') != '':
+    if terminal_id.replace(' ', '').isalnum():
         if server.addTerminal(terminal_id):
             print(f'Added new terminal with id={terminal_id} to whitelist')
         else:
@@ -254,10 +256,11 @@ def addEmployee():
     print('\n--- Add Employee to database ---\n')
 
     emp_name = input('Enter name of the employee you want to add:\n')
-    if emp_name.strip(' ') != '':
+    if emp_name.replace(' ', '').isalpha():
         while True:
             try:
                 rfid_uid = int(input('Enter RFID card identifier:\n'))
+                
             except:
                 print('--- invalid input (RFID UID can only contain digits)---')
                 continue
@@ -366,7 +369,7 @@ def modifyName():
         rfid_uid = emp_data[2]
 
         emp_name = input('Enter new name for the employee:\n')
-        if emp_name.strip(' ') != '':
+        if emp_name.replace(' ', '').isalpha():
             try:
                 database.modifyEmpName(rfid_uid, emp_name)
                 print(f'{emp_data[1]}\'s name changed to: {emp_name}')
@@ -399,11 +402,24 @@ def main():
     while __PROGRAM_STATUS__:
         mainMenu()
     server.stop()
+    srv.logging.shutdown()
 
     clrScreen()
     if config.__SHOW_LOG_ON_EXIT__:
         for log in srv.getSessionLogs():
             print(log)
+            
+    if not os.path.exists('logs.zip'):
+         with ZipFile('logs.zip', 'w', ZIP_BZIP2) as ziplog:
+             ziplog.write(srv.__SESSION_LOG_PATH__)
+    else:
+        with ZipFile('logs.zip', 'a', ZIP_BZIP2) as ziplog:
+            ziplog.write(srv.__SESSION_LOG_PATH__)
+
+    os.remove(srv.__SESSION_LOG_PATH__)
+
+
+    
 
 
 if __name__ == "__main__":

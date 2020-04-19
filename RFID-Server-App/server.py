@@ -18,16 +18,11 @@ __MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0), (__RFID_RECORD__, 0)]
 # path to whitelist file
 __WHITE_LIST_PATH__ = './whitelist.txt'
 
-# path of log directory
-__LOGS_DIR__ = "./logs/"
-
 # path to current session log
-__SESSION_LOG_PATH__ = f"{__LOGS_DIR__}{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
+__SESSION_LOG_PATH__ = f"{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
 
 # logger configuration
 if config.__LOGGING_ENABLED__:
-    if not os.path.exists(__LOGS_DIR__):
-        os.mkdir(__LOGS_DIR__)
     if config.__DEBUG_MODE__:
         logLevel = logging.DEBUG
     else:

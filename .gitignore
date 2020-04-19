@@ -148,3 +148,6 @@ whitelist.txt
 
 # vs code
 *.code-workspace
+
+# log archives
+logs.zip
