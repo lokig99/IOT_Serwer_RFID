@@ -3,7 +3,7 @@
 
 # ------------- config ---------------
 
-# terminal's mqtt identificator
+# terminal's mqtt identifier
 __TERMINAL_ID__ = 'terminal'
 
 # mqqt broker
