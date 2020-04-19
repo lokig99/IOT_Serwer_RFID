@@ -13,7 +13,7 @@ __SERVER_ID__ = 'server'  # (default is 'server')
 __BROADCAST_INTERVAL__ = 60  # (default is 60)
 
 # print logs on exit
-__SHOW_LOG_ON_EXIT__ = True  # (True/False)
+__SHOW_LOG_ON_EXIT__ = False  # (True/False)
 
 # enable logging
 __LOGGING_ENABLED__ = True  # (True/False)

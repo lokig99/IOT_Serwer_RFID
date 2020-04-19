@@ -339,7 +339,7 @@ class EmployeesDataBase:
             with open(filePath, "w") as file:
                 for workDay in workDays:
                     file.write(
-                        f"{workDay[0].strftime('%d/%m/%Y')};{workDay[1].strftime('%d/%m/%Y')};{int(workDay[2].total_seconds())}\n")
+                        f"{workDay[0].strftime('%d/%m/%Y %H:%M:%S')};{workDay[1].strftime('%d/%m/%Y %H:%M:%S')};{int(workDay[2].total_seconds())}\n")
         return filePath
 
 

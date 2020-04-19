@@ -134,7 +134,8 @@ def modifyEmpDataMenu():
     print("[2] Change RFID card")
     print('[3] Return to previous menu')
 
-    _selectOption(options=_modifyEmpDataMenuOptions, on_except=manageEmployeesMenu)
+    _selectOption(options=_modifyEmpDataMenuOptions,
+                  on_except=manageEmployeesMenu)
 
 
 def showServerLogs():
@@ -152,7 +153,7 @@ def addTerminal():
     print('(<-- manage terminals menu)')
     print('\n--- Add new terminal to white-list ---\n')
     terminal_id = input('Enter identifier of terminal you want to add:\n')
-    if terminal_id.replace(' ', '').isalnum():
+    if terminal_id.replace(' ', '').replace('-', 'a').replace('_', 'a').isalnum():
         if server.addTerminal(terminal_id):
             print(f'Added new terminal with id={terminal_id} to whitelist')
         else:
@@ -256,11 +257,11 @@ def addEmployee():
     print('\n--- Add Employee to database ---\n')
 
     emp_name = input('Enter name of the employee you want to add:\n')
-    if emp_name.replace(' ', '').isalpha():
+    if emp_name.replace(' ', '').replace('-', 'a').replace('_', 'a').isalpha():
         while True:
             try:
                 rfid_uid = int(input('Enter RFID card identifier:\n'))
-                
+
             except:
                 print('--- invalid input (RFID UID can only contain digits)---')
                 continue
@@ -352,7 +353,6 @@ def modifyRFID():
         except data.InvalidInputDataError:
             print('invalid input - RFID UID cannot be negative')
 
-
     input('\n\n--- press enter to return to previous menu ---')
     manageEmployeesMenu()
 
@@ -369,7 +369,7 @@ def modifyName():
         rfid_uid = emp_data[2]
 
         emp_name = input('Enter new name for the employee:\n')
-        if emp_name.replace(' ', '').isalpha():
+        if emp_name.replace(' ', '').replace('-', 'a').replace('_', 'a').isalpha():
             try:
                 database.modifyEmpName(rfid_uid, emp_name)
                 print(f'{emp_data[1]}\'s name changed to: {emp_name}')
@@ -408,18 +408,16 @@ def main():
     if config.__SHOW_LOG_ON_EXIT__:
         for log in srv.getSessionLogs():
             print(log)
-            
+
     if not os.path.exists('logs.zip'):
-         with ZipFile('logs.zip', 'w', ZIP_BZIP2) as ziplog:
-             ziplog.write(srv.__SESSION_LOG_PATH__)
+        with ZipFile('logs.zip', 'w', ZIP_BZIP2) as ziplog:
+            ziplog.write(srv.__SESSION_LOG_PATH__)
     else:
         with ZipFile('logs.zip', 'a', ZIP_BZIP2) as ziplog:
             ziplog.write(srv.__SESSION_LOG_PATH__)
 
     os.remove(srv.__SESSION_LOG_PATH__)
 
-
-    
 
 
 if __name__ == "__main__":

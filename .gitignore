@@ -151,3 +151,6 @@ whitelist.txt
 
 # log archives
 logs.zip
+
+# used config.py files
+config.py
