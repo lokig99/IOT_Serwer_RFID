@@ -4,24 +4,18 @@ import os
 import sys
 import time
 import logging
-import config
+from config import *
 import keyboard
 import rfid
+import json
 import threading
+from mqttConstans import *
 from zipfile import ZipFile, ZIP_BZIP2
 from datetime import datetime as date
 
 
 # The MQTT client.
 client = mqtt.Client()
-
-# MQTT topics
-__TERMINAL_DEBUG__ = 'terminal/debug'
-__RFID_RECORD__ = 'rfid/record'
-__SERVER_BROADCAST__ = 'server/broadcast'
-
-__MQTT_TOPICS__ = [(__TERMINAL_DEBUG__, 0),
-                   (__RFID_RECORD__, 0)]
 
 # path to current session log
 __SESSION_LOG_PATH__ = f"{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
@@ -43,38 +37,40 @@ rootLogger.addHandler(consoleHandler)
 logging.debug('logger configured correctly')
 
 
-def __call_server(topic, message, terminal_id):
-    client.publish(topic, message + '.' + terminal_id)
+def __call_server(topic, msg_json):
+    client.publish(topic, msg_json)
     logging.info(
-        f'sent MQTT message: [{topic}] {message}.{terminal_id}')
+        f'sent MQTT message: [{topic}] {msg_json}')
 
 
-def __process_message(client, userdata, message):
-    message_decoded = (str(message.payload.decode('utf-8'))).split('.')
+def __process_message(client, userdata, msg):
+    msg_json = json.loads(msg.payload)
 
-    if message.topic == __SERVER_BROADCAST__:
-        if len(message_decoded) == 1:
-            server_id = message_decoded[0]
-            logging.info(
-                f'received broadcast msg from server with id={server_id}')
-            client.publish(__SERVER_BROADCAST__,
-                           f'{config.__TERMINAL_ID__}.{server_id}')
+    if msg.topic == BROADCAST_REQUEST:
+        logging.info(
+            f'received broadcast msg from server with id={msg_json[JSON_SERVER_ID]}')
+        reply = json.dumps({JSON_TERMINAL_ID: TERMINAL_ID,
+                            JSON_SERVER_ID: msg_json[JSON_SERVER_ID]})
+        __call_server(BROADCAST_REPLY, reply)
 
 
 def __connect_to_broker():
-    client.connect(config.__BROKER__)
+    client.connect(BROKER)
     client.on_message = __process_message
     client.loop_start()
-    client.subscribe(__SERVER_BROADCAST__)
-    logging.info(f'connected to broker: {config.__BROKER__}')
-    __call_server(__TERMINAL_DEBUG__, 'Client connected',
-                  config.__TERMINAL_ID__)
+    client.subscribe(BROADCAST_REQUEST)
+    logging.info(f'connected to broker: {BROKER}')
+
+    msg_json = json.dumps(
+        {JSON_TERMINAL_ID: TERMINAL_ID, JSON_TEXT: 'Client connected'})
+    __call_server(TERMINAL_DEBUG, msg_json)
 
 
 def __disconnect_from_broker():
-    __call_server(__TERMINAL_DEBUG__, 'Client disconnected',
-                  config.__TERMINAL_ID__)
-    logging.info(f'disconnected from broker: {config.__BROKER__}')
+    msg_json = json.dumps(
+        {JSON_TERMINAL_ID: TERMINAL_ID, JSON_TEXT: 'Client disconnected'})
+    __call_server(TERMINAL_DEBUG, msg_json)
+    logging.info(f'disconnected from broker: {BROKER}')
     client.disconnect()
     client.loop_stop()
 
@@ -87,8 +83,10 @@ def __rfid_scan_loop(terminal_id):
         if rfid_uid != -1:
             if prev_rfid_uid != rfid_uid:
                 prev_rfid_uid = rfid_uid
+                msg_json = json.dumps({JSON_RFID_UID: rfid_uid, JSON_TERMINAL_ID: TERMINAL_ID,
+                                       JSON_RFID_DATE: date.now().strftime("%d.%m.%Y.%H.%M")})
                 __call_server(
-                    __RFID_RECORD__, f'{rfid_uid}.{date.now().strftime("%d.%m.%Y.%H.%M")}', config.__TERMINAL_ID__)
+                    RFID_RECORD, msg_json)
         else:
             prev_rfid_uid = -1
 
@@ -98,14 +96,14 @@ def __rfid_scan_loop(terminal_id):
 def run():
     __connect_to_broker()
     rfid_scanner = threading.Thread(target=__rfid_scan_loop, args=(
-        config.__TERMINAL_ID__, ), daemon=True)
+        TERMINAL_ID, ), daemon=True)
     rfid_scanner.start()
 
 
 if __name__ == "__main__":
     run()
     while True:
-        inp = input('enter "stop" to exit\n')
+        inp = input('\nenter "stop" to exit\n')
         if inp.lower() == 'stop':
             break
 
@@ -121,4 +119,3 @@ if __name__ == "__main__":
             ziplog.write(__SESSION_LOG_PATH__)
 
     os.remove(__SESSION_LOG_PATH__)
-    #os.system('cls' if os.name == 'nt' else 'clear')

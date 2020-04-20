@@ -4,10 +4,10 @@
 # ------------- config ---------------
 
 # terminal's mqtt identifier
-__TERMINAL_ID__ = 'terminal'
+TERMINAL_ID = 'terminal'
 
 # mqqt broker
-__BROKER__ = '127.0.0.1'
+BROKER = '127.0.0.1'
 
 # ------------------------------------
 

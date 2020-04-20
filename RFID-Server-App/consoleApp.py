@@ -2,10 +2,10 @@
 import data
 import os
 import time
-import server as srv
-import config
-from zipfile import ZipFile, ZIP_BZIP2
 import bz2
+import server as srv
+from config import *
+from zipfile import ZipFile, ZIP_BZIP2
 from operator import itemgetter
 
 # The employees database
@@ -88,8 +88,8 @@ def _selectList(positions, fun, *args, printList=True):
 
 def mainMenu():
     clrScreen()
-    print('MQTT Broker address:', config.__BROKER__,
-          '\tServer ID:', config.__SERVER_ID__)
+    print('MQTT Broker address:', BROKER,
+          '\tServer ID:', SERVER_ID)
     print("\n--- Console RFID server Menu ---\n")
     print("[1] Manage terminals")
     print("[2] Manage employees")
@@ -140,7 +140,7 @@ def modifyEmpDataMenu():
 
 def showServerLogs():
     clrScreen()
-    if config.__LOGGING_ENABLED__:
+    if LOGGING_ENABLED:
         for log in srv.getSessionLogs():
             print(log)
     else:
@@ -206,7 +206,7 @@ def showTerminalsNet():
         print('Try again after next scan (server broadcast interval)')
 
     print(
-        f'\n\nNext network scan in {config.__BROADCAST_INTERVAL__ - round(time.time() - server.getLastBroadcastTime())} seconds from now')
+        f'\n\nNext network scan in {BROADCAST_INTERVAL - round(time.time() - server.getLastBroadcastTime())} seconds from now')
 
     input('\n\n--- press enter to return to previous menu ---')
     manageTerminalsMenu()
@@ -233,7 +233,7 @@ def showTerminalsWhitelist():
         print('--- No terminals on whitelist ---')
 
     print(
-        f'\n\nNext network scan in {config.__BROADCAST_INTERVAL__ - round(time.time() - server.getLastBroadcastTime())} seconds from now',
+        f'\n\nNext network scan in {BROADCAST_INTERVAL - round(time.time() - server.getLastBroadcastTime())} seconds from now',
         '(isAvailable status)')
 
     input('\n\n--- press enter to return to previous menu ---')
@@ -406,7 +406,7 @@ def main():
     database.save()
 
     clrScreen()
-    if config.__SHOW_LOG_ON_EXIT__:
+    if SHOW_LOG_ON_EXIT:
         for log in srv.getSessionLogs():
             print(log)
 

@@ -142,7 +142,7 @@ cython_debug/
 reports/
 
 # whitelist file
-whitelist.txt
+whitelist.json
 
 # vs code
 *.code-workspace
