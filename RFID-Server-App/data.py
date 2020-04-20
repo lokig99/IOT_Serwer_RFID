@@ -2,13 +2,11 @@
 import datetime
 import os
 import threading
+import pickle
 from random import randrange
 
-__DATA_DIR_PATH__ = "./data/"
-__EMP_HISTORY_DIR_PATH__ = f"{__DATA_DIR_PATH__}emp_history/"
-__DATA_EXTENSION__ = ".data"
+__DATA_FILEPATH__ = "./database.pickle"
 __REPORT_EXTENSION__ = ".csv"
-__EMPLOYEES_FILE_PATH__ = f"{__DATA_DIR_PATH__}employees{__DATA_EXTENSION__}"
 __REPORT_DIR_PATH__ = "./reports/"
 __DEFAULT_KEY_LEN__ = 4
 
@@ -35,65 +33,48 @@ def generateKey(length):
 class EmployeesDataBase:
     def __init__(self):
         self.__emp_hist_dict = {}
-        self.__name_emp_dict = {}
         self.__emp_name_dict = {}
         self.__rfid_emp_dict = {}
         self.__emp_rfid_dict = {}
-        self.__reload_data()
+        self.__load_data()
         self.__lock = threading.Lock()
 
     def __clear_dictionaries(self):
         self.__emp_hist_dict.clear()
         self.__emp_rfid_dict.clear()
-        self.__name_emp_dict.clear()
         self.__emp_name_dict.clear()
         self.__rfid_emp_dict.clear()
 
-    def __reload_data(self):
-        if not os.path.exists(__DATA_DIR_PATH__):
-            os.mkdir(__DATA_DIR_PATH__)
-
-        if not os.path.exists(__EMP_HISTORY_DIR_PATH__):
-            os.mkdir(__EMP_HISTORY_DIR_PATH__)
-
-        if not os.path.exists(__EMPLOYEES_FILE_PATH__):
-            open(__EMPLOYEES_FILE_PATH__, "w")
-
-        if os.stat(__EMPLOYEES_FILE_PATH__).st_size == 0:
+    def __load_data(self):
+        if not os.path.exists(__DATA_FILEPATH__):
             return
 
         self.__clear_dictionaries()
 
-        # create name_emp and rfid_emp dictionary entries
-        with open(__EMPLOYEES_FILE_PATH__, "r") as file:
-            line = file.readline()
-            while line != "":
-                (emp_uid, name, rfid_uid) = line.split(';')
-                self.__name_emp_dict[name] = emp_uid
-                self.__emp_name_dict[emp_uid] = name
-                self.__rfid_emp_dict[int(rfid_uid)] = emp_uid
-                self.__emp_rfid_dict[emp_uid] = int(rfid_uid)
-                line = file.readline()
+        with open(__DATA_FILEPATH__, 'rb') as dbFile:
+            dbDictionaries = pickle.load(dbFile)
+            self.__emp_name_dict = dbDictionaries[0]
+            self.__rfid_emp_dict = dbDictionaries[1]
+            self.__emp_hist_dict = dbDictionaries[2]
 
-        # add entries to emp_history dictionary
-        for emp_uid in self.__emp_name_dict.keys():
-            self.__emp_hist_dict[emp_uid] = []
-            filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
-            if os.path.exists(filePath):
-                with open(filePath, "r") as file:
-                    line = file.readline()
-                    while line != "":
-                        entry = tuple([int(item)
-                                       for item in line.split(';')[:-1]])
-                        entry += tuple([line.split(';')[-1].strip('\n')])
-                        self.__emp_hist_dict[emp_uid].append(entry)
-                        line = file.readline()
+        # create emp_rfid dictionary
+        for item in self.__rfid_emp_dict.items():
+            (rfid_uid, emp_uid) = item
+            self.__emp_rfid_dict[emp_uid] = rfid_uid
+
+    def __serialize_data(self):
+        with open(__DATA_FILEPATH__, 'wb') as dbFile:
+            dbDictionaries = []
+            dbDictionaries.append(self.__emp_name_dict)
+            dbDictionaries.append(self.__rfid_emp_dict)
+            dbDictionaries.append(self.__emp_hist_dict)
+            pickle.dump(dbDictionaries, dbFile)
+
+    def save(self):
+        self.__serialize_data()
 
     def __remove_employee_from_dict(self, emp_uid):
         """
-        Deletes all entries of single employee in database dictionaries
-        without modifying data files on storage device or reloading whole
-        database from storage.\n
         Returns:\n 
         \tNone 
         """
@@ -102,14 +83,11 @@ class EmployeesDataBase:
 
         del self.__emp_hist_dict[emp_uid]
         del self.__rfid_emp_dict[self.__emp_rfid_dict[emp_uid]]
-        del self.__name_emp_dict[self.__emp_name_dict[emp_uid]]
         del self.__emp_rfid_dict[emp_uid]
         del self.__emp_name_dict[emp_uid]
 
-    def __validate_input(self, emp_uid="", name="", rfid_uid=0):
-        if ';' in emp_uid or ';' in name:
-            return False
-        if not isinstance(rfid_uid, int) or rfid_uid < 0:
+    def __validate_input(self, rfid_uid):
+        if not isinstance(rfid_uid, int):
             return False
         return True
 
@@ -125,15 +103,6 @@ class EmployeesDataBase:
 
         with self.__lock:
             emp_uid = self.__rfid_emp_dict[rfid_uid]
-            filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
-            if os.path.exists(filePath):
-                file = open(filePath, "a")
-            else:
-                file = open(filePath, "w")
-
-            entryText = f"{date.day};{date.month};{date.year};{date.hour};{date.minute};{rfid_terminal}\n"
-            file.write(entryText)
-            file.close()
 
             # update emp_history dictionary
             self.__emp_hist_dict[emp_uid].append(
@@ -148,7 +117,7 @@ class EmployeesDataBase:
         \tdata.RfidAlreadyUsedError
         \tdata.EmployeeRecordAlreadyExistsError
         """
-        if not self.__validate_input(rfid_uid=rfid_uid, emp_uid=emp_uid, name=name):
+        if not self.__validate_input(rfid_uid):
             raise InvalidInputDataError
 
         if rfid_uid in self.__rfid_emp_dict.keys():
@@ -162,17 +131,14 @@ class EmployeesDataBase:
             elif emp_uid in self.__emp_name_dict.keys():
                 raise EmployeeRecordAlreadyExistsError
 
-            if os.path.exists(__EMPLOYEES_FILE_PATH__):
-                file = open(__EMPLOYEES_FILE_PATH__, "a")
-            else:
-                file = open(__EMPLOYEES_FILE_PATH__, "w")
-
             if name == "":
                 name = emp_uid
 
-            file.write(f"{emp_uid};{name};{rfid_uid}\n")
-            file.close()
-            self.__reload_data()
+            # add new employee to dictionaries
+            self.__emp_name_dict[emp_uid] = name
+            self.__rfid_emp_dict[rfid_uid] = emp_uid
+            self.__emp_rfid_dict[emp_uid] = rfid_uid
+            self.__emp_hist_dict[emp_uid] = []
 
     def deleteEmployee(self, rfid_uid, delHistory=True):
         """
@@ -183,31 +149,14 @@ class EmployeesDataBase:
         \tdata.NoSuchEmployeeError
         \tdata.DataBaseError
         """
-        if not self.__validate_input(rfid_uid=rfid_uid):
+        if not self.__validate_input(rfid_uid):
             raise InvalidInputDataError
 
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
 
-        if not os.path.exists(__EMPLOYEES_FILE_PATH__):
-            raise DataBaseError
-
         with self.__lock:
             emp_uid = self.__rfid_emp_dict[rfid_uid]
-
-            # rewrite file without deleted employee
-            with open(__EMPLOYEES_FILE_PATH__, "r") as file:
-                lines = file.readlines()
-            with open(__EMPLOYEES_FILE_PATH__, "w") as file:
-                for line in lines:
-                    if line.split(';')[0] != emp_uid:
-                        file.write(line)
-
-            # delete history file
-            filePath = f"{__EMP_HISTORY_DIR_PATH__}{emp_uid}{__DATA_EXTENSION__}"
-            if os.path.exists(filePath) and delHistory:
-                os.remove(filePath)
-
             self.__remove_employee_from_dict(emp_uid)
 
     def modifyEmpName(self, rfid_uid, newName):
@@ -218,16 +167,15 @@ class EmployeesDataBase:
         \tdata.InvalidInputDataError
         \tdata.NoSuchEmployeeError
         """
-        if not self.__validate_input(rfid_uid=rfid_uid, name=newName):
+        if not self.__validate_input(rfid_uid):
             raise InvalidInputDataError
 
         if rfid_uid not in self.__rfid_emp_dict.keys():
             raise NoSuchEmployeeError
 
-        emp_uid = self.__rfid_emp_dict[rfid_uid]
-
-        self.deleteEmployee(rfid_uid, delHistory=False)
-        self.addEmployee(rfid_uid, emp_uid=emp_uid, name=newName)
+        with self.__lock:
+            emp_uid = self.__rfid_emp_dict[rfid_uid]
+            self.__emp_name_dict[emp_uid] = newName
 
     def modifyEmpRFID(self, rfid_uid, new_rfid_uid):
         """
@@ -238,7 +186,7 @@ class EmployeesDataBase:
         \tdata.NoSuchEmployeeError
         \tdata.RfidAlreadyUsedError
         """
-        if not self.__validate_input(rfid_uid=rfid_uid) or not self.__validate_input(rfid_uid=new_rfid_uid):
+        if not self.__validate_input(rfid_uid) or not self.__validate_input(new_rfid_uid):
             raise InvalidInputDataError
 
         if rfid_uid not in self.__rfid_emp_dict.keys():
@@ -247,11 +195,11 @@ class EmployeesDataBase:
         if new_rfid_uid in self.__rfid_emp_dict.keys():
             raise RfidAlreadyUsedError
 
-        emp_uid = self.__rfid_emp_dict[rfid_uid]
-        name = self.__emp_name_dict[emp_uid]
-
-        self.deleteEmployee(rfid_uid, delHistory=False)
-        self.addEmployee(new_rfid_uid, emp_uid=emp_uid, name=name)
+        with self.__lock:
+            emp_uid = self.__rfid_emp_dict[rfid_uid]
+            del self.__rfid_emp_dict[rfid_uid]
+            self.__rfid_emp_dict[new_rfid_uid] = emp_uid
+            self.__emp_rfid_dict[emp_uid] = new_rfid_uid
 
     def getEmployeesDataSummary(self, includeHistory=True):
         """
@@ -306,7 +254,8 @@ class EmployeesDataBase:
 
         emp_uid = self.__rfid_emp_dict[rfid_uid]
 
-        if len(self.__emp_hist_dict[emp_uid]) < 2: # at least two entries needed
+        # at least two entries needed
+        if len(self.__emp_hist_dict[emp_uid]) < 2:
             raise NoDataError
 
         if not os.path.exists(__REPORT_DIR_PATH__):
@@ -371,16 +320,8 @@ class InvalidInputDataError(DataBaseError):
 ####################
 
 
-def test():
-    data = EmployeesDataBase()
-    # data.addEmployee(12345)
-    # data.addEmployee(1111)
-    # data.addEmployee(2222)
-
-    data.modifyEmpRFID(1111, 9999)
-
-    print(data.getEmployeesDataSummary())
-
+def dataInfo():
+    print('This is only a database module')
 
 if __name__ == "__main__":
-    test()
+    dataInfo()

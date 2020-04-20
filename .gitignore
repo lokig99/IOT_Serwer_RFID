@@ -139,9 +139,7 @@ dmypy.json
 cython_debug/
 
 #utility folders
-data/
 reports/
-logs/
 
 # whitelist file
 whitelist.txt
@@ -154,3 +152,6 @@ logs.zip
 
 # used config.py files
 config.py
+
+#database serialized
+database.pickle

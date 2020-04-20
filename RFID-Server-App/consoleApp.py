@@ -403,6 +403,7 @@ def main():
         mainMenu()
     server.stop()
     srv.logging.shutdown()
+    database.save()
 
     clrScreen()
     if config.__SHOW_LOG_ON_EXIT__:
