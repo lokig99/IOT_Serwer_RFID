@@ -2,48 +2,20 @@
 import paho.mqtt.client as mqtt
 import os
 import time
-import logging
-import data
+import src.data as data
 import threading
 import json
+from src.logger import *
 from config import *
-from mqttConstans import *
+from src.constants import *
 from datetime import datetime as date
 
+# create DATA directory if doesn't exist already
+if not os.path.exists(DATA_DIR):
+    os.mkdir(DATA_DIR)
+
 # path to whitelist file
-__WHITELIST_PATH__ = './whitelist.json'
-
-# path to current session log
-__SESSION_LOG_PATH__ = f"{date.now().strftime('%d-%m-%Y-%H-%M-%S')}.log"
-
-# logger configuration
-if LOGGING_ENABLED:
-    if DEBUG_MODE:
-        logLevel = logging.DEBUG
-    else:
-        logLevel = logging.INFO
-
-    logging.basicConfig(filename=__SESSION_LOG_PATH__, filemode='w',
-                        format='[%(asctime)s][%(levelname)s] %(message)s', level=logLevel, datefmt='%d-%m-%Y %H:%M:%S')
-else:
-    logging.disable(logging.CRITICAL)
-
-
-def getSessionLogs():
-    """
-    Returns:\n
-    \tlist(str) logs
-    """
-    logs = []
-    if not os.path.exists(__SESSION_LOG_PATH__):
-        return logs
-
-    with open(__SESSION_LOG_PATH__, 'r') as logfile:
-        lines = logfile.readlines()
-        for line in lines:
-            logs.append(line.strip('\n'))
-        return logs
-
+__WHITELIST_PATH__ = f'{DATA_DIR}/whitelist.json'
 
 class NetworkScanner:
     def __init__(self):
@@ -134,6 +106,8 @@ class Server:
         self.__server_client = mqtt.Client()
         # The network scanner
         self.__networkScanner = NetworkScanner()
+  
+        self.dataModified = False
 
     def __load_whitelist(self):
         if not os.path.exists(__WHITELIST_PATH__):
@@ -150,10 +124,11 @@ class Server:
             logging.info(
                 '--- finished loading terminal-IDs from whitelist file ---')
 
-    def __save_whitelist(self):
+    def save_whitelist(self):
         with open(__WHITELIST_PATH__, 'w') as wlFile:
             json.dump(self.__terminals_whitelist, wlFile, indent=4)
             logging.info('saved terminals whitelist')
+
 
     def __process_message(self, client, userdata, msg):
         msg_json = json.loads(msg.payload)
@@ -188,6 +163,7 @@ class Server:
                     f'added entry for employee named {self.__database.getEmpName(rfid_uid)} (rfid_uid={rfid_uid})')
             except:
                 logging.exception('unknown exception')
+            self.dataModified = True
 
     def __connect_to_broker(self):
         self.__server_client.connect(BROKER)
@@ -210,6 +186,8 @@ class Server:
             self.__terminals_whitelist.append(terminal_id)
             logging.info(
                 f'addTerminal - terminal with id={terminal_id} added to whitelist')
+
+            self.dataModified = True
         return True
 
     def removeTerminal(self, terminal_id):
@@ -240,23 +218,4 @@ class Server:
     def stop(self):
         self.__disconnect_from_broker()
         self.__networkScanner.stop()
-        self.__save_whitelist()
-
-
-
-if __name__ == "__main__":
-    server = Server()
-    scanner = NetworkScanner()
-    server.run()
-    scanner.run()
-    server.addTerminal('terminal')
-
-    while True:
-        inp = input('enter "q" to exit\n')
-        if inp == 'q':
-            break
-
-    server.stop()
-    scanner.stop()
-    for log in getSessionLogs():
-        print(log)
+        self.save_whitelist()

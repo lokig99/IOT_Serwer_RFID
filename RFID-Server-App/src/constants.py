@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+
+# DATA directory
+DATA_DIR = './data'
+
 # MQTT topics
 TERMINAL_DEBUG = 'terminal/debug'
 RFID_RECORD = 'rfid/record'

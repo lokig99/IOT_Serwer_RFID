@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import data
+import src.data as data
 import os
 import time
-import bz2
-import server as srv
+import threading
+import src.server as srv
+from src.logger import *
 from config import *
-from zipfile import ZipFile, ZIP_BZIP2
 from operator import itemgetter
 
 # The employees database
@@ -16,6 +16,29 @@ server = srv.Server(database)
 
 # The main loop bool value
 __PROGRAM_STATUS__ = True
+
+dataModified = [False]
+
+__STOP_THREADS__ = False
+
+
+def __autosave_loop(app_modified, database, server):
+    interval = 30  # in seconds
+    lastSave = time.time()
+
+    while True:
+        now = time.time()
+        if now - lastSave > interval:
+            if app_modified[0] or server.dataModified:
+                logging.info('[Autosave] starting job')
+                database.save()
+                server.save_whitelist()
+                app_modified[0] = False
+                server.dataModified = False
+            else:
+                logging.info('[Autosave] no changes made -> skipping')
+            lastSave = now
+        time.sleep(1)
 
 
 def clrScreen():
@@ -141,7 +164,7 @@ def modifyEmpDataMenu():
 def showServerLogs():
     clrScreen()
     if LOGGING_ENABLED:
-        for log in srv.getSessionLogs():
+        for log in getSessionLogs():
             print(log)
     else:
         print('\t--- logging disabled ---')
@@ -156,6 +179,7 @@ def addTerminal():
     if terminal_id.replace(' ', '').replace('-', 'a').replace('_', 'a').isalnum():
         if server.addTerminal(terminal_id):
             print(f'Added new terminal with id={terminal_id} to whitelist')
+            dataModified[0] = True
         else:
             print(f'Terminal with id={terminal_id} is already on whitelist')
 
@@ -177,6 +201,7 @@ def removeTerminal():
             (terminal_id, res) = result
             if res:
                 print(f'Removed terminal with id={terminal_id} from whitelist')
+                dataModified[0] = True
         else:
             print(f'\n--- no terminal selected ---')
 
@@ -271,6 +296,7 @@ def addEmployee():
             database.addEmployee(rfid_uid, name=emp_name)
             print(f'added new employee named {emp_name} to database')
             print(f'registered new RFID card with UID: {rfid_uid}')
+            dataModified[0] = True
         except data.InvalidInputDataError:
             print('--- invalid input (check if name does not contain ";" signs)')
         except data.RfidAlreadyUsedError:
@@ -295,6 +321,7 @@ def removeEmployee():
             database.deleteEmployee(rfid_uid)
             print(f'removed employee named {emp_data[1]} from database')
             print(f'unregistered RFID card with UID: {rfid_uid}')
+            dataModified[0] = True
         except data.DataBaseError:
             print(f'--- uknown database error ---')
 
@@ -347,6 +374,7 @@ def modifyRFID():
             print(
                 f'{emp_data[1]}\'s RFID card updated with new UID: {new_rfid_uid}')
             print(f'unregistered RFID card with UID: {rfid_uid}')
+            dataModified[0] = True
         except data.RfidAlreadyUsedError:
             print(
                 f'given RFID card with UID: {new_rfid_uid} is already used by employee named {database.getEmpName(new_rfid_uid)}')
@@ -373,6 +401,7 @@ def modifyName():
             try:
                 database.modifyEmpName(rfid_uid, emp_name)
                 print(f'{emp_data[1]}\'s name changed to: {emp_name}')
+                dataModified[0] = True
             except data.InvalidInputDataError:
                 print('--- invalid input (check if name does not contain ";" signs)')
 
@@ -398,28 +427,20 @@ _modifyEmpDataMenuOptions = (modifyName, modifyRFID, manageEmployeesMenu)
 
 def main():
     server.run()
+    autosaver = threading.Thread(target=__autosave_loop, args=(
+        dataModified, database, server), daemon=True)
+    autosaver.start()
 
     while __PROGRAM_STATUS__:
         mainMenu()
     server.stop()
-    srv.logging.shutdown()
+    logging.shutdown()
     database.save()
 
     clrScreen()
     if SHOW_LOG_ON_EXIT:
-        for log in srv.getSessionLogs():
+        for log in getSessionLogs():
             print(log)
-
-    if not os.path.exists('logs.zip'):
-        with ZipFile('logs.zip', 'w', ZIP_BZIP2) as ziplog:
-            ziplog.write(srv.__SESSION_LOG_PATH__)
-    else:
-        with ZipFile('logs.zip', 'a', ZIP_BZIP2) as ziplog:
-            ziplog.write(srv.__SESSION_LOG_PATH__)
-
-    os.remove(srv.__SESSION_LOG_PATH__)
-
-
 
 if __name__ == "__main__":
     main()

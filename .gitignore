@@ -140,6 +140,8 @@ cython_debug/
 
 #utility folders
 reports/
+logs/
+data/
 
 # whitelist file
 whitelist.json
@@ -147,11 +149,12 @@ whitelist.json
 # vs code
 *.code-workspace
 
-# log archives
-logs.zip
+# zip archives
+*.zip
 
 # used config.py files
 config.py
 
-#database serialized
-database.pickle
+#pickle serialized fata
+*.pickle
+*.pkl

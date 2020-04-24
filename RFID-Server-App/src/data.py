@@ -4,8 +4,13 @@ import os
 import threading
 import pickle
 from random import randrange
+from src.constants import DATA_DIR
 
-__DATA_FILEPATH__ = "./database.pickle"
+# create DATA directory if doesn't exist already
+if not os.path.exists(DATA_DIR):
+    os.mkdir(DATA_DIR)
+
+__DATA_FILEPATH__ = f"{DATA_DIR}/database.pkl"
 __REPORT_EXTENSION__ = ".csv"
 __REPORT_DIR_PATH__ = "./reports/"
 __DEFAULT_KEY_LEN__ = 4
@@ -71,7 +76,8 @@ class EmployeesDataBase:
             pickle.dump(dbDictionaries, dbFile)
 
     def save(self):
-        self.__serialize_data()
+        with self.__lock:
+            self.__serialize_data()
 
     def __remove_employee_from_dict(self, emp_uid):
         """
@@ -87,9 +93,7 @@ class EmployeesDataBase:
         del self.__emp_name_dict[emp_uid]
 
     def __validate_input(self, rfid_uid):
-        if not isinstance(rfid_uid, int):
-            return False
-        return True
+        return isinstance(rfid_uid, int)
 
     def addEntry(self, rfid_uid, rfid_terminal='terminal', date=datetime.datetime.now()):
         """
@@ -317,11 +321,3 @@ class RfidAlreadyUsedError(DataBaseError):
 class InvalidInputDataError(DataBaseError):
     pass
 
-####################
-
-
-def dataInfo():
-    print('This is only a database module')
-
-if __name__ == "__main__":
-    dataInfo()
