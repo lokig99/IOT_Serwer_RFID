@@ -9,6 +9,23 @@ TERMINAL_ID = 'terminal'
 # mqqt broker
 BROKER = '127.0.0.1'
 
+# port
+# if port is set to 0 then default mosquitto port is used
+# TLS default port: 8883
+PORT = 0
+
+# Enable TLS certification
+TLS_ENABLED = False # (True/False)
+
+# Path to .crt file
+# Fill this field if you enable TLS
+TLS_CERT_FILE = ""
+
+# TLS user 
+TLS_USERNAME = ""
+
+TLS_PASSWORD = ""
+
 # ------------------------------------
 
 def configInfo():

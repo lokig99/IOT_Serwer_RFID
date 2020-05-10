@@ -17,6 +17,7 @@ if not os.path.exists(DATA_DIR):
 # path to whitelist file
 __WHITELIST_PATH__ = f'{DATA_DIR}/whitelist.json'
 
+
 class NetworkScanner:
     def __init__(self):
         # The MQTT client.
@@ -31,7 +32,21 @@ class NetworkScanner:
         return self.__class__.__name__
 
     def __connect_to_broker(self):
-        self.__client.connect(BROKER)
+        if TLS_ENABLED:
+            if TLS_CERT_FILE == "":
+                logging.error(f"[{self}] No path to cert file in config file")
+                
+            self.__client.tls_set(TLS_CERT_FILE)
+ 
+            if TLS_USERNAME != "":
+                self.__client.username_pw_set(
+                    username=TLS_USERNAME, password=TLS_PASSWORD)
+
+        if PORT == 0:
+            self.__client.connect(BROKER)
+        else:
+            self.__client.connect(BROKER, port=PORT)
+
         self.__client.on_message = self.__process_broadcast
         self.__client.loop_start()
         self.__client.subscribe(BROADCAST_REPLY)
@@ -106,7 +121,7 @@ class Server:
         self.__server_client = mqtt.Client()
         # The network scanner
         self.__networkScanner = NetworkScanner()
-  
+
         self.dataModified = False
 
     def __load_whitelist(self):
@@ -128,7 +143,6 @@ class Server:
         with open(__WHITELIST_PATH__, 'w') as wlFile:
             json.dump(self.__terminals_whitelist, wlFile, indent=4)
             logging.info('saved terminals whitelist')
-
 
     def __process_message(self, client, userdata, msg):
         msg_json = json.loads(msg.payload)
@@ -166,7 +180,21 @@ class Server:
             self.dataModified = True
 
     def __connect_to_broker(self):
-        self.__server_client.connect(BROKER)
+        if TLS_ENABLED:
+            if TLS_CERT_FILE == "":
+                logging.error("No path to cert file in config file")
+                
+            self.__server_client.tls_set(TLS_CERT_FILE)
+           
+            if TLS_USERNAME != "":
+                self.__server_client.username_pw_set(
+                    username=TLS_USERNAME, password=TLS_PASSWORD)
+
+        if PORT == 0:
+            self.__server_client.connect(BROKER)
+        else:
+            self.__server_client.connect(BROKER, port=PORT)
+
         self.__server_client.on_message = self.__process_message
         self.__server_client.loop_start()
         self.__server_client.subscribe([(RFID_RECORD, 0), (TERMINAL_DEBUG, 0)])
@@ -218,4 +246,5 @@ class Server:
     def stop(self):
         self.__disconnect_from_broker()
         self.__networkScanner.stop()
-        self.save_whitelist()
+        if self.dataModified:
+            self.save_whitelist()

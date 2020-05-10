@@ -9,6 +9,11 @@ BROKER = '127.0.0.1'  # (default is '127.0.0.1')
 # server identifier
 SERVER_ID = 'server'  # (default is 'server')
 
+# port
+# if port is set to 0 then default mosquitto port is used
+# TLS default port: 8883
+PORT = 0
+
 # server broadcast interval (in seconds)
 BROADCAST_INTERVAL = 60  # (default is 60)
 
@@ -20,6 +25,18 @@ LOGGING_ENABLED = True  # (True/False)
 
 # debug mode (show logs with level DEBUG)
 DEBUG_MODE = False  # (True/False)
+
+# Enable TLS certification
+TLS_ENABLED = False # (True/False)
+
+# Path to .crt file
+# Fill this field if you enable TLS
+TLS_CERT_FILE = ""
+
+# TLS user 
+TLS_USERNAME = ""
+
+TLS_PASSWORD = ""
 
 # ---------------------------------------------------
 

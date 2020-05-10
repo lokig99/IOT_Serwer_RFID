@@ -55,7 +55,18 @@ def __process_message(client, userdata, msg):
 
 
 def __connect_to_broker():
-    client.connect(BROKER)
+    if TLS_ENABLED:
+        if TLS_CERT_FILE == "":
+            logging.error("No path to .crt file in config file")
+        client.tls_set(TLS_CERT_FILE)
+        if TLS_USERNAME != "":
+            client.username_pw_set(
+                username=TLS_USERNAME, password=TLS_PASSWORD)
+    
+    if PORT == 0:
+        client.connect(BROKER)
+    else:
+        client.connect(BROKER, port=PORT)
     client.on_message = __process_message
     client.loop_start()
     client.subscribe(BROADCAST_REQUEST)
